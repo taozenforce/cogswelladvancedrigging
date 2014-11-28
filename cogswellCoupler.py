@@ -60,16 +60,16 @@ class CouplerApp():
                 pmc.delete(list(constraintNodes))
 
             else:
-                #Find matching jnt in skeleton, if available
+                # Find matching jnt in skeleton, if available
                 skinJoint = jnt.replace(self._rigPrefix, self._bindPrefix, 1)
                 if not pmc.objExists(skinJoint):
                     continue
 
                 pmc.pointConstraint(jnt, skinJoint, maintainOffset=False)
                 orient = pmc.orientConstraint(jnt, skinJoint, maintainOffset=False)
-                orient.interpType.set(2)    #Interplotion 2 = shortest (to avoid flipping)
+                orient.interpType.set(2)  # Interplotion 2 = shortest (to avoid flipping)
 
-        #After disconnect, revert skeleton to bind pose
+        # After disconnect, revert skeleton to bind pose
         if doDisconnect:
             skinRoot = joints[0]
             dagPoses = pmc.listConnections(skinRoot, type='dagPose', d=True, s=False)
@@ -80,11 +80,9 @@ class CouplerApp():
             print 'COGSWELL COUPLER :: Rig Connected'
 
 
-##MAIN EXECUTION
+# MAIN EXECUTION
 def GUI():
     global MAIN_WINDOW
 
     MAIN_WINDOW = CouplerApp()
     MAIN_WINDOW.Draw('AdvancedRiggingCoupler')
-
-    #done

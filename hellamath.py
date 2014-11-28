@@ -12,15 +12,16 @@ __author__ = 'ssykes@cogswell.edu'
 import pymel.core as pmc
 from pymel.core.datatypes import Vector
 
+
 def getPoleVectorPosition(joints, offset, curveGuide=True):
     """
     Creates locator with offset for the ideal pole vector control location
     Uses basic math to find the average position across all the joints and creates a vector
     from the average midpoint to the middle joint in the chain.
     """
-    totalJoints = len(joints)    
+    totalJoints = len(joints)
     joints = map(pmc.nodetypes.Joint, joints)
-    
+
     midpoint = Vector()
     midpoint.x = sum([jnt.getTranslation('world')[0] for jnt in joints])
     midpoint.y = sum([jnt.getTranslation('world')[1] for jnt in joints])
@@ -37,7 +38,7 @@ def getPoleVectorPosition(joints, offset, curveGuide=True):
         midJointPos.z = joints[first].getTranslation('world')[2] + joints[second].getTranslation('world')[2]
         midJointPos /= 2
     else:
-        midJointPos = Vector(pmc.xform(joints[totalJoints/2], q=True, worldSpace=True, translation=True))
+        midJointPos = Vector(pmc.xform(joints[totalJoints / 2], q=True, worldSpace=True, translation=True))
 
     poleVector = (midJointPos - midpoint).normal()
 
@@ -45,9 +46,11 @@ def getPoleVectorPosition(joints, offset, curveGuide=True):
     result.setTranslation((poleVector * offset) + midJointPos, 'world')
 
     if curveGuide:
-        crv = pmc.curve(degree=1, point=[midpoint,(poleVector * 200) + midJointPos], k=[0, 1], n='curveGuide')
+        crv = pmc.curve(degree=1, point=[midpoint, (poleVector * 200) + midJointPos], k=[0, 1], n='curveGuide')
+        return [result, crv]
 
     return result
+
 
 def getPoleVectorFromIK(offset):
     """
@@ -60,6 +63,7 @@ def getPoleVectorFromIK(offset):
 
     loc = getPoleVectorPosition(joints, offset)
     loc.select(replace=True)
+
 
 def getPoleVectorFromJoints(offset):
     """

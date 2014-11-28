@@ -1,7 +1,7 @@
 from itertools import izip
 import pymel.core as pmc
 
-from support import align, getAttribute
+from advutils import getAttribute, alignObjects
 
 
 def makeMultiConstraint(targets, source, controller, attrName='currentSpace',
@@ -21,7 +21,7 @@ def makeMultiConstraint(targets, source, controller, attrName='currentSpace',
 
     if addLocatorSpace:
         loc = pmc.spaceLocator(n='loc_follow_' + source.shortName())
-        align.alignObjects(loc, source)
+        alignObjects(loc, source)
         targets.append(loc)
         enumNames.append('locator')
 
@@ -36,7 +36,7 @@ def makeMultiConstraint(targets, source, controller, attrName='currentSpace',
     constraints = list()
     for tgt, spaceName in izip(targets, enumNames):
         enumAttr = getAttribute(controller, attrName,
-            at='enum', enumName=spaceName, keyable=True, longName=attrName)
+                                at='enum', enumName=spaceName, keyable=True, longName=attrName)
 
         spaceEnums = enumAttr.getEnums().keys()
         if spaceName not in spaceEnums:
@@ -50,7 +50,7 @@ def makeMultiConstraint(targets, source, controller, attrName='currentSpace',
         else:
             tgtTransform = pmc.createNode('transform',
                                           n='tgt_{0}_to_{1}'.format(source.shortName(), tgt.shortName()))
-            align.alignObjects(tgtTransform, source)
+            alignObjects(tgtTransform, source)
             pmc.parentConstraint(tgt, tgtTransform, maintainOffset=maintainOffset)
 
         orient = pmc.orientConstraint(tgtTransform, source, skip=skipRotate, maintainOffset=maintainOffset)

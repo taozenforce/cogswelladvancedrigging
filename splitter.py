@@ -75,7 +75,7 @@ class Splitter(object):
 #
 #
 # class Splitter(object):
-#     WINDOW_NAME = 'JointSplitterPyMel'
+# WINDOW_NAME = 'JointSplitterPyMel'
 #     WINDOW_TITLE = 'Joint Splitter PyMel'
 #
 #     def __init__(self):

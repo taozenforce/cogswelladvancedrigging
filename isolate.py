@@ -1,14 +1,15 @@
 import pymel.core as pmc
 
+
 def getAttribute(node, attr, **kwargs):
     if not pmc.attributeQuery(attr, node=node, exists=True):
         pmc.addAttr(node, ln=attr, **kwargs)
 
     return pmc.Attribute('{0}.{1}'.format(node, attr))
 
-def isolateOnControl(worldTarget, localTarget, transform, control, attributeName,
-    orientation=True, position=False, useLocators=False):
 
+def isolateOnControl(worldTarget, localTarget, transform, control, attributeName,
+                     orientation=True, position=False, useLocators=False):
     if isinstance(worldTarget, basestring):
         worldTarget = pmc.PyNode(worldTarget)
 
@@ -43,10 +44,12 @@ def isolateOnControl(worldTarget, localTarget, transform, control, attributeName
 
     isolateAttr = getAttribute(control, attributeName, min=0, max=1, keyable=True)
 
+    rev = pmc.createNode('reverse', name='rev_{0}_to_local'.format(basename))
+
     for con in constraints:
-        weightAttrs = con.getWeightAliasList()        
-        rev = pmc.createNode('reverse', name='rev_{0}_to_local'.format(basename))
+        weightAttrs = con.getWeightAliasList()
         isolateAttr.connect(weightAttrs[0])
         isolateAttr.connect(rev.inputX)
         rev.outputX.connect(weightAttrs[1])
 
+    return [worldGrp, localGrp]

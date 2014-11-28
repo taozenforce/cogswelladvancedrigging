@@ -86,21 +86,21 @@ def stretchySplineIk(ikHndl, useScale=False, stretchLimits=None, globalScaleAttr
     """
     Builds makes selected SplineIK Stretchy using either joint scale
        or translate, as passed in parameter.
-       If usePointOnCurve is False, calculates length of chain using curve Info, which doesn't give as accurate a result but invlolves less nodes and connections
+       If usePointOnCurve is False, calculates length of chain using curve Info, which doesn't
+       give as accurate a result but invlolves less nodes and connections
        If true, locators are created to calculate the true length to stretch spline IK joints
     """
 
     if isinstance(ikHndl, basestring):
         ikHndl = pmc.nodetypes.IkHandle(ikHndl)
 
-    #Need to find effector and start/end joint of this IK handle
+    # Need to find effector and start/end joint of this IK handle
     curve = pmc.listConnections((ikHndl + '.inCurve'), sh=True)[0]
     effector = pmc.listConnections((ikHndl + '.endEffector'))[0]
     endJoint = pmc.listConnections((effector + '.tx'))[0]
     joints = ikHndl.getJointList()
 
-    #Building proper nodes
-    normalizeNode = None
+    # Building proper nodes
     if usePointOnCurve:
         paramStep = 1.0 / len(joints)
         locators = list()
@@ -118,7 +118,6 @@ def stretchySplineIk(ikHndl, useScale=False, stretchLimits=None, globalScaleAttr
             currentStep += paramStep
             i += 1
 
-
         totalDistNode = pmc.createNode('plusMinusAverage', n='pls_{0}_totallength'.format(ikHndl.shortName()))
 
         for i, loc in enumerate(locators[:-2]):
@@ -126,7 +125,7 @@ def stretchySplineIk(ikHndl, useScale=False, stretchLimits=None, globalScaleAttr
 
             # Using locator's shape nodes to connect the worldPosition attribute
             loc.getShape().worldPosition[0].connect(distNode.point1)
-            locators[i+1].getShape().worldPosition[0].connect(distNode.point2)
+            locators[i + 1].getShape().worldPosition[0].connect(distNode.point2)
             distNode.distance.connect(totalDistNode.input1D[i])
 
         normalizeNode = pmc.createNode('multiplyDivide', n='div_{0}_normalizer'.format(ikHndl.shortName()))

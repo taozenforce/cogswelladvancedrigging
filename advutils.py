@@ -1,5 +1,6 @@
 import pymel.core as pmc
 
+
 def getAttribute(node, attr, **kwargs):
     if not pmc.attributeQuery(attr, node=node, exists=True):
         pmc.addAttr(node, ln=attr, **kwargs)
@@ -21,7 +22,6 @@ def alignObjects(sources, target, position=True, rotation=True, rotateOrder=Fals
     else:
         targetPos = pmc.xform(target, q=True, worldSpace=True, translation=True)
 
-    targetRot = None
     if rotation and isinstance(target, pmc.nodetypes.Joint):
         # Use temporary locator in case we're aligning to joints
         # xform gives inconsistent results for them

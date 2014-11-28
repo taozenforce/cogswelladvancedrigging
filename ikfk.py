@@ -4,6 +4,7 @@ import pymel.core as pmc
 from hellamath import getPoleVectorPosition
 from advutils import alignObjects
 
+
 def makeIkFkJoints(joints, attribute=None, stretchy=False,
                    jointPrefix='rig', ikJointPrefix='ikj', fkJointPrefix='fkj'):
     """
@@ -21,7 +22,7 @@ def makeIkFkJoints(joints, attribute=None, stretchy=False,
     # use a temp name until we learn the actual names for each joints
     fkJoints = pmc.duplicate(joints, parentOnly=True, name='fkTEMP')
 
-    ## FK Joint setup
+    # FK Joint setup
 
     # Use our prefix to uniquely rename duplicated joints based on the original copy
     # third parameter in jnt.replace allows me to limit the number of string replacements,
@@ -44,7 +45,7 @@ def makeIkFkJoints(joints, attribute=None, stretchy=False,
 
     pmc.parent(fkJoints[0], fkGrp)
 
-    ## IK Joint setup
+    # IK Joint setup
     # Mostly the same code, this could be remade into a simpler function
 
     ikJoints = pmc.duplicate(joints, parentOnly=True, name='ikTEMP')
@@ -74,7 +75,7 @@ def makeIkFkJoints(joints, attribute=None, stretchy=False,
         attrMaxValue = outputAttr.getMax()
         if attrMaxValue > 1.0:
             attrNormalizeNode = pmc.shadingNode('remapValue', asUtility=True,
-                name='rmv_{0}_ikfk_attr'.format(startJoint.shortName()))
+                                                name='rmv_{0}_ikfk_attr'.format(startJoint.shortName()))
             pmc.connectAttr(attribute, attrNormalizeNode.inputValue)
             attrNormalizeNode.inputMax.set(attrMaxValue)
             outputAttr = attrNormalizeNode.outValue
@@ -119,6 +120,7 @@ def makeIkFkJoints(joints, attribute=None, stretchy=False,
     pmc.select(clear=True)
     return ikGrp, fkGrp, blendNodes
 
+
 def matchFkToIk(fkControls, msgAttr='ikjoints', autoKey=True):
     """
     Matches fkControls to match the current pose of the underlying ik duplicate joint chains
@@ -126,13 +128,15 @@ def matchFkToIk(fkControls, msgAttr='ikjoints', autoKey=True):
     """
 
     ikJoints = None
+    switchControl = None
+    switchAttr = None
     for ctl in fkControls:
         if pmc.hasAttr(ctl, msgAttr):
             ikJoints = pmc.listConnections('{0}.{1}'.format(ctl, msgAttr),
                                            destination=False, source=True)
 
             attr = pmc.listConnections('{0}.ikfk'.format(ctl), destination=False,
-                                                source=True, plugs=True, scn=True)[0]
+                                       source=True, plugs=True, scn=True)[0]
             switchControl = attr.node()
             switchAttr = attr.name(includeNode=False)
             break
@@ -154,6 +158,7 @@ def matchFkToIk(fkControls, msgAttr='ikjoints', autoKey=True):
 
     pmc.headsUpMessage('BAMF!')
 
+
 def matchIkToFk(ikControl, ikPole, offset=100.0, msgAttr='fkjoints', autoKey=True):
     """
     Matches ikControl and ikPole Vector control to match the current pose of underlying
@@ -165,12 +170,12 @@ def matchIkToFk(ikControl, ikPole, offset=100.0, msgAttr='fkjoints', autoKey=Tru
                                    destination=False, source=True)
 
     attr = pmc.listConnections('{0}.ikfk'.format(ikControl), destination=False,
-                                        source=True, plugs=True, scn=True)[0]
+                               source=True, plugs=True, scn=True)[0]
     switchControl = attr.node()
     switchAttr = attr.name(includeNode=False)
 
+    frameBeforeCurrent = pmc.currentTime(q=True) - 1
     if autoKey:
-        frameBeforeCurrent = pmc.currentTime(q=True) - 1
         pmc.setKeyframe(switchControl, attribute=switchAttr, time=frameBeforeCurrent,
                         value=1, outTangentType='step')
         pmc.setKeyframe([ikControl, ikPole], time=frameBeforeCurrent, outTangentType='step')
