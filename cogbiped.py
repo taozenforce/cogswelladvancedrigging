@@ -6,31 +6,7 @@ Example code for a modular rigging system. This code was tested in the creation 
 
 import maya.cmds as cmds
 
-from advutils import getAttribute, alignObjects
-
-ROO_XYZ, ROO_YZX, ROO_ZXY, ROO_XZY, ROO_YXZ, ROO_ZYX = range(6)
-
-
-def zeroOut(node):
-    preTransform = cmds.group(n='pre_{0}'.format(node), empty=True)
-    alignObjects([preTransform, ], node)
-    cmds.parent(node, preTransform)
-    cmds.makeIdentity(node, apply=True)
-
-    return preTransform
-
-
-def makeControlNode(name, targetObject=None, alignRotation=True):
-    control = cmds.group(empty=True, name=name)
-    pretransform = cmds.group(empty=True, name='pre_' + control)
-
-    if targetObject:
-        alignObjects([control, pretransform], targetObject, rotation=alignRotation)
-
-    cmds.parent(control, pretransform)
-    cmds.makeIdentity(control, apply=True)
-
-    return control, pretransform
+from advutils import getAttribute, alignObjects, makeControlNode, ROO_XZY, ROO_YXZ
 
 
 def makePoleVectorLine(startObj, endObj, parent=None):
@@ -1180,7 +1156,7 @@ class RiggingGenericFK(Rigging):
 
         # joints = [u'rig_right_arm_shoulder', u'rig_right_arm_elbow', u'rig_right_arm_wrist']
         # RiggingArm(name='right_arm', parent='rig_right_arm_clavicle', joints=joints, mainControl='ctl_main',
-        #            switchboard='ctl_settings', noFlipVector=(-1, 0, 0))
+        # switchboard='ctl_settings', noFlipVector=(-1, 0, 0))
 
         # joints = [u'rig_spine5', u'rig_head']
         # RiggingHead(name='head', parent='rig_spine4', joints=joints, mainControl='ctl_main',
