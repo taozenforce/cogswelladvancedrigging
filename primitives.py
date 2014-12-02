@@ -7,6 +7,22 @@ from splitter import Splitter
 from stretchy import stretchySplineIk
 
 
+def makeAutoRigLocators():
+    start = pmc.spaceLocator('loc_squishy_start')
+    end = pmc.spaceLocator('loc_squishy_end')
+    return start, end
+
+
+def squishySplineIkCallback():
+    try:
+        start = pmc.PyNode('loc_squishy_start')
+        end = pmc.PyNode('loc_squishy_end')
+    except pmc.MayaNodeError:
+        return
+
+    squishySplineIk(start, end)
+
+
 def squishySplineIk(startLoc, endLoc):
     ikJoints = list()
     startJoint = pmc.createNode('joint')
