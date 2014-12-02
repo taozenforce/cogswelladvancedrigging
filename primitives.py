@@ -30,22 +30,30 @@ def squishySplineIk(startLoc, endLoc):
 
     # Create second set of joints
     rigJoints = adv.makeDuplicateJoints(joints=ikJoints, search='ikj_', replace='jnt_', connectBone=False)
-    print rigJoints
-    # HACK I haven't figured out how to create SDK nodes procedurall, so making some dummy locs to make the curve I need
+    # HACK I haven't figured out how to create SDK nodes procedurally,
+    # so making some dummy locs to make the curve I need
     a = pmc.createNode('transform')
     b = pmc.createNode('transform')
 
-    pmc.setDrivenKeyframe(b.ty, currentDriver=a.ty, driverValue=0, value=0,
-                          inTangentType='flat', outTangentType='flat')
-    pmc.setDrivenKeyframe(b.ty, currentDriver=a.ty, driverValue=3, value=2.5,
-                          inTangentType='flat', outTangentType='flat')
-    pmc.setDrivenKeyframe(b.ty, currentDriver=a.ty, driverValue=10, value=0,
-                          inTangentType='flat', outTangentType='flat')
+    pmc.setKeyframe(a.ty, t=0, value=2.5, inTangentType='flat', outTangentType='flat')
+    pmc.setKeyframe(a.ty, t=10, value=0, inTangentType='flat', outTangentType='flat')
+    pmc.keyTangent(a.ty, index=[0], inAngle=0)
+    pmc.keyTangent(a.ty, index=[1], inAngle=-30)
+    pmc.keyTangent(a.ty, index=[0], outAngle=0)
+    pmc.keyTangent(a.ty, index=[1], outAngle=-30)
 
-    animCurve = a.ty.listConnections()[0]
-    a.ty.disconnect(animCurve.input)
-    animCurve.output.disconnect(b.ty)
-    animCurve.rename('squash_ramp')
+    animSquashCurve = a.ty.listConnections()[0]
+    animSquashCurve.output.disconnect(a.ty)
+    animSquashCurve.rename('squash_ramp')
+
+    pmc.setKeyframe(a.tx, t=0, value=0, inTangentType='flat', outTangentType='flat')
+    pmc.setKeyframe(a.tx, t=5, value=1, inTangentType='flat', outTangentType='flat')
+    pmc.setKeyframe(a.tx, t=10, value=0, inTangentType='flat', outTangentType='flat')
+
+    animTwistCurve = a.tx.listConnections()[0]
+    animTwistCurve.output.disconnect(a.tx)
+    animTwistCurve.rename('twist_ramp')
+
     pmc.delete(a, b)
 
     animControls = dict()
@@ -85,7 +93,7 @@ def squishySplineIk(startLoc, endLoc):
 
     pmc.skinCluster(clusterJoints, spline, maximumInfluences=3)
 
-    pmc.parentConstraint()
+    pmc.parentConstraint(animControls['lower_spine'][0], ikJoints[0], maintainOffset=True)
 
     for clj in clusterJoints:
         clj.radius.set(3)
@@ -99,7 +107,16 @@ def squishySplineIk(startLoc, endLoc):
     animControls['lower_spine'][0].worldMatrix[0].connect(splineIkHandle.dWorldUpMatrix)
     animControls['upper_spine'][0].worldMatrix[0].connect(splineIkHandle.dWorldUpMatrixEnd)
 
-    stretchySplineIk(splineIkHandle, useScale=True, globalScaleAttr='ctl_main.size')
+    normalizeNode = stretchySplineIk(splineIkHandle, useScale=True, globalScaleAttr='ctl_main.size')
+    sqrtScale = pmc.createNode('multiplyDivide', n='sqrt_spine_scale')
+    sqrtScale.operation.set(3)
+    sqrtScale.input2X.set(0.5)
+    normalizeNode.outputX.connect(sqrtScale.input1X)
+
+    invScale = pmc.createNode('multiplyDivide', n='div_spine_inverse_scale')
+    invScale.operation.set(2)
+    invScale.input1X.set(1.0)
+    sqrtScale.outputX.connect(invScale.input2X)
 
     for i, jnt in enumerate(rigJoints):
         preTransform = adv.zeroOut(jnt, 'pre')
@@ -109,22 +126,25 @@ def squishySplineIk(startLoc, endLoc):
         pmc.orientConstraint(ikJoints[i], ikNode)
 
         twistNode = adv.zeroOut(jnt, 'hlp_twist')
+        twistCache = pmc.createNode('frameCache', n='frm_{0}_twist'.format(jnt))
+        animTwistCurve.output.connect(twistCache.stream)
+        twistCache.varyTime.set(i)
 
+        rotateMultiplier = pmc.createNode('multiplyDivide', n='mul_{0}_twist'.format(jnt.shortName()))
 
-    # Make sure inverse scale is connected
+        twistCache.varying.connect(rotateMultiplier.input2X)
+        animControls['middle_spine'][0].rotateY.connect(rotateMultiplier.input1X)
+        rotateMultiplier.outputX.connect(twistNode.rotateX)
 
-# animCurve = pmc.PyNode('ctl_spine0_volume')
-# invScale = pmc.PyNode('div_inverse_scale')
-# for i, jnt in enumerate(pmc.selected()):
-#     cache = pmc.createNode('frameCache', n='frm_{0}'.format(jnt.shortName()))
-#     animCurve.output.connect(cache.stream)
-#     cache.varyTime.set(i)
-#
-#     pow = pmc.createNode('multiplyDivide', n='pow_{0}'.format(jnt.shortName()))
-#     pow.operation.set(3)
-#     invScale.outputX.connect(pow.input1X)
-#     cache.varying.connect(pow.input2X)
-#     pow.outputX.connect(jnt.scaleY)
-#     pow.outputX.connect(jnt.scaleZ)
+        volumeCache = pmc.createNode('frameCache', n='frm_{0}_volume'.format(jnt.shortName()))
+        animSquashCurve.output.connect(volumeCache.stream)
+        volumeCache.varyTime.set(i)
+
+        pow_ = pmc.createNode('multiplyDivide', n='pow_{0}'.format(jnt.shortName()))
+        pow_.operation.set(3)
+        invScale.outputX.connect(pow_.input1X)
+        volumeCache.varying.connect(pow_.input2X)
+        pow_.outputX.connect(jnt.scaleY)
+        pow_.outputX.connect(jnt.scaleZ)
 
     return ikJoints

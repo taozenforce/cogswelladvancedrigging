@@ -176,3 +176,5 @@ def stretchySplineIk(ikHndl, useScale=False, stretchLimits=None, globalScaleAttr
             outputAttr.connect(stretchNode.input1X)
             stretchNode.input2X.set(jnt.translateX.get())
             stretchNode.outputX.connect(jnt.translateX)
+
+    return normalizeNode
