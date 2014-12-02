@@ -7,10 +7,49 @@ from splitter import Splitter
 from stretchy import stretchySplineIk
 
 
+def GUI():
+    winName = 'squishy_ik_win'
+
+    if pmc.window(winName, exists=1):
+        pmc.deleteUI(winName)
+    win = pmc.window(winName, t='Squishy IK')
+    pmc.formLayout(numberOfDivisions=100)
+    pmc.rowColumnLayout(nc=2, rs=[15, 15], columnOffset=(1, 'both', 5))
+    pmc.text(l='1 - Create Placement Locators')
+    pmc.button(l='Make Locators', c=pmc.Callback(makeAutoRigLocators))
+
+    pmc.separator()
+    pmc.separator()
+
+    pmc.text(l='2 - Place locators where the spine begins and ends')
+    pmc.button(l='Select Locators', c=pmc.Callback(selectAutoRigLocators))
+
+    pmc.separator()
+    pmc.separator()
+
+    pmc.text(l='3 - With the locators place, go ahead and create the rig!')
+    pmc.button(l='Create Squishy Spine', c=pmc.Callback(squishySplineIkCallback))
+
+    pmc.separator()
+    pmc.separator()
+
+    pmc.text(l='4 - Select the joints to add to the skin cluster')
+    pmc.button(l='Select Bind Joints', c=pmc.Callback(selectSquishyJointsCallback))
+
+    win.show()
+
+
 def makeAutoRigLocators():
-    start = pmc.spaceLocator('loc_squishy_start')
-    end = pmc.spaceLocator('loc_squishy_end')
+    start = pmc.spaceLocator(n='loc_squishy_start')
+    end = pmc.spaceLocator(n='loc_squishy_end')
     return start, end
+
+
+def selectAutoRigLocators():
+    try:
+        pmc.select(['loc_squishy_start', 'loc_squishy_end'], replace=True)
+    except pmc.MayaNodeError:
+        pmc.warning('Locators not found in scene!')
 
 
 def squishySplineIkCallback():
@@ -20,7 +59,18 @@ def squishySplineIkCallback():
     except pmc.MayaNodeError:
         return
 
-    squishySplineIk(start, end)
+    joints = squishySplineIk(start, end)
+    pmc.select(joints, r=True)
+
+
+def selectSquishyJointsCallback():
+    try:
+        grp = pmc.PyNode('grp_spine_bind_joints')
+    except pmc.MayaNodeError:
+        return
+
+    bindJoints = [i for i in grp.getChildren(ad=True, type='joint') if i.startswith('jnt_')]
+    pmc.select(bindJoints, r=True)
 
 
 def squishySplineIk(startLoc, endLoc):
@@ -35,14 +85,14 @@ def squishySplineIk(startLoc, endLoc):
     startJoint.orientJoint('xzy', secondaryAxisOrient='zup')
     pmc.makeIdentity(endJoint, apply=True, jointOrient=True)
 
-    Splitter.doSplit(startJoint, 11)
+    Splitter.doSplit(startJoint, 10)
 
     ikJoints.append(startJoint)
     ikJoints.extend(reversed(startJoint.getChildren(ad=True, type='joint')))
 
     for i, ikj in enumerate(ikJoints):
         ikj.radius.set(2)
-        ikj.rename('ikj_spine{0:d}'.format(i))
+        ikj.rename('ikj_spine{0:02d}'.format(i))
 
     # Create second set of joints
     rigJoints = adv.makeDuplicateJoints(joints=ikJoints, search='ikj_', replace='jnt_', connectBone=False)
@@ -93,19 +143,16 @@ def squishySplineIk(startLoc, endLoc):
 
     splineIkHandle = splineIk[0]
     spline = splineIk[2]
-
+    spline.rename('crv_spine')
     clusterJoints = list()
     clusterJoints.append(pmc.createNode('joint', n='clj_spine0'))
-    adv.alignObjects(clusterJoints[-1], animControls['lower_spine'][0])
-    pmc.parent(clusterJoints[-1], animControls['lower_spine'][0])
+    pmc.parentConstraint(animControls['lower_spine'][0], clusterJoints[-1])
 
     clusterJoints.append(pmc.createNode('joint', n='clj_spine1'))
-    adv.alignObjects(clusterJoints[-1], animControls['middle_spine'][0])
-    pmc.parent(clusterJoints[-1], animControls['middle_spine'][0])
+    pmc.parentConstraint(animControls['middle_spine'][0], clusterJoints[-1])
 
     clusterJoints.append(pmc.createNode('joint', n='clj_spine2'))
-    adv.alignObjects(clusterJoints[-1], animControls['upper_spine'][0])
-    pmc.parent(clusterJoints[-1], animControls['upper_spine'][0])
+    pmc.parentConstraint(animControls['upper_spine'][0], clusterJoints[-1])
 
     pmc.skinCluster(clusterJoints, spline, maximumInfluences=3)
 
@@ -134,8 +181,10 @@ def squishySplineIk(startLoc, endLoc):
     invScale.input1X.set(1.0)
     sqrtScale.outputX.connect(invScale.input2X)
 
+    jointGroups = list()
     for i, jnt in enumerate(rigJoints):
         preTransform = adv.zeroOut(jnt, 'pre')
+        jointGroups.append(preTransform)
 
         ikNode = adv.zeroOut(jnt, 'hlp_ik')
         pmc.pointConstraint(ikJoints[i], ikNode)
@@ -163,4 +212,10 @@ def squishySplineIk(startLoc, endLoc):
         pow_.outputX.connect(jnt.scaleY)
         pow_.outputX.connect(jnt.scaleZ)
 
-    return ikJoints
+    pmc.group(animControls['lower_spine'][1], animControls['upper_spine'][1], animControls['middle_spine'][1],
+              n='grp_spine_anim')
+    pmc.group(splineIkHandle, spline, n='grp_spine_rig_systems')
+    pmc.group(clusterJoints, startJoint, n='grp_spine_system_joints')
+    pmc.group(jointGroups, n='grp_spine_bind_joints')
+
+    return rigJoints
