@@ -4,34 +4,34 @@
 Example code for a modular rigging system. This code was tested in the creation of goldie and daniel
 """
 
-import maya.cmds as cmds
+import pymel.core as pmc
 
 from advutils import getAttribute, alignObjects, makeControlNode, ROO_XZY, ROO_YXZ
 
 
 def makePoleVectorLine(startObj, endObj, parent=None):
-    curve = cmds.curve(degree=1, point=[(0, 0, 0), (0, 0, 1)], knot=range(2),
+    curve = pmc.curve(degree=1, point=[(0, 0, 0), (0, 0, 1)], knot=range(2),
                        name='spl_{0}To{1}_poleLine'.format(startObj, endObj))
 
-    curveShape = cmds.listRelatives(curve, s=True, f=True)[0]
-    startClu = cmds.cluster(curveShape + '.cv[0]', relative=True,
+    curveShape = pmc.listRelatives(curve, s=True, f=True)[0]
+    startClu = pmc.cluster(curveShape + '.cv[0]', relative=True,
                             name=curve.replace('spl_', 'clu_', 1) + '_start')[1]
-    endClu = cmds.cluster(curveShape + '.cv[1]', relative=True,
+    endClu = pmc.cluster(curveShape + '.cv[1]', relative=True,
                           name=curve.replace('spl_', 'clu_', 1) + '_end')[1]
 
-    cmds.pointConstraint(startObj, startClu)
-    cmds.pointConstraint(endObj, endClu)
+    pmc.pointConstraint(startObj, startClu)
+    pmc.pointConstraint(endObj, endClu)
 
     for node in curve, startClu, endClu:
-        cmds.setAttr(node + '.inheritsTransform', 0)
+        pmc.setAttr(node + '.inheritsTransform', 0)
 
-    cmds.setAttr(curveShape + '.overrideEnabled', 1)
-    cmds.setAttr(curveShape + '.overrideDisplayType', 1)
-    cmds.setAttr(startClu + '.visibility', 0)
-    cmds.setAttr(endClu + '.visibility', 0)
+    pmc.setAttr(curveShape + '.overrideEnabled', 1)
+    pmc.setAttr(curveShape + '.overrideDisplayType', 1)
+    pmc.setAttr(startClu + '.visibility', 0)
+    pmc.setAttr(endClu + '.visibility', 0)
 
     if parent:
-        cmds.parent(startClu, endClu, curve, parent)
+        pmc.parent(startClu, endClu, curve, parent)
 
     return curve
 
@@ -40,25 +40,25 @@ def makePoleVectorControlFromHandle(name, ikHandle, offset=10, parent=None):
     """
     Creates pole position using the poleVector attribute from the specified ikHandle
     """
-    polePosition = [i * offset for i in cmds.getAttr(ikHandle + '.poleVector')[0]]
+    polePosition = [i * offset for i in pmc.getAttr(ikHandle + '.poleVector')]
 
     ctrl, preTransform = makeControlNode(name)
 
     # move to start joint location
-    cmds.xform(preTransform, worldSpace=True,
-               translation=cmds.xform(cmds.ikHandle(ikHandle, q=True, startJoint=True), q=True, worldSpace=True,
+    pmc.xform(preTransform, worldSpace=True,
+               translation=pmc.xform(pmc.ikHandle(ikHandle, q=True, startJoint=True), q=True, worldSpace=True,
                                       translation=True))
 
     # offset along pole vector (move relative)
-    cmds.xform(preTransform, relative=True, objectSpace=True, translation=polePosition)
+    pmc.xform(preTransform, relative=True, objectSpace=True, translation=polePosition)
 
-    midJoint = cmds.ikHandle(ikHandle, q=True, jointList=True)
+    midJoint = pmc.ikHandle(ikHandle, q=True, jointList=True)
     curve = makePoleVectorLine(midJoint[len(midJoint) / 2], ctrl, parent)
 
-    cmds.connectAttr(ctrl + '.visibility', curve + '.visibility')
+    pmc.connectAttr(ctrl + '.visibility', curve + '.visibility')
 
     if parent:
-        cmds.parent(preTransform, parent)
+        pmc.parent(preTransform, parent)
 
     return ctrl, curve
 
@@ -71,52 +71,52 @@ class Rigging(object):
         self._mainControl = mainControl
         self._rigControls = dict()
         self.lockAttrs = list()
-        self.transform = cmds.group(empty=True, name='grp_{0}_rig'.format(self._name))
+        self.transform = pmc.group(empty=True, name='grp_{0}_rig'.format(self._name))
 
         if parent is None:
             locName = 'loc_{0}_parentMe'.format(self._name)
-            if cmds.objExists(locName):
-                cmds.delete(locName)
-            self._parent = cmds.spaceLocator(n=locName)[0]
+            if pmc.objExists(locName):
+                pmc.delete(locName)
+            self._parent = pmc.spaceLocator(n=locName)
             alignObjects([self._parent], self._joints[0])
-            cmds.parent(self._parent, self.transform)
+            pmc.parent(self._parent, self.transform)
         else:
             self._parent = parent
 
-        if cmds.objExists('ctl_visibility'):
+        if pmc.objExists('ctl_visibility'):
             visAttr = getAttribute('ctl_visibility', self._name, at='short', min=0, max=1, dv=1)
-            cmds.setAttr(visAttr, edit=True, channelBox=True)
-            cmds.connectAttr(visAttr, self.transform + '.v')
+            pmc.setAttr(visAttr, edit=True, channelBox=True)
+            pmc.connectAttr(visAttr, self.transform + '.v')
 
     def lockAndHide(self, lock):
         for at in self.lockAttrs:
-            cmds.setAttr(at, lock=lock)
-            cmds.setAttr(at, keyable=not lock)
-            cmds.setAttr(at, channelBox=not lock)
+            pmc.setAttr(at, lock=lock)
+            pmc.setAttr(at, keyable=not lock)
+            pmc.setAttr(at, channelBox=not lock)
 
     def makeJointSystems(self, prefix, isolation=True, makeConstraints=True):
-        joints = cmds.duplicate(self._joints, parentOnly=True, name='{0}_TEMP'.format(prefix))
-        joints[0] = cmds.rename(joints[0], self._joints[0].replace('rig_', prefix + '_', 1))
+        joints = pmc.duplicate(self._joints, parentOnly=True, name='{0}_TEMP'.format(prefix))
+        joints[0] = pmc.rename(joints[0], self._joints[0].replace('rig_', prefix + '_', 1))
 
         i = 1
         for jnt, dupe in zip(self._joints[1:], joints[1:]):
-            joints[i] = cmds.rename(dupe, jnt.replace('rig_', prefix + '_', 1))
+            joints[i] = pmc.rename(dupe, jnt.replace('rig_', prefix + '_', 1))
             i += 1
 
-        grp = cmds.group(empty=True, name='grp_{0}_{1}_joints'.format(prefix, self._name))
-        root_rotation = cmds.xform(joints[0], q=True, ws=True, rotation=True)
-        root_position = cmds.xform(joints[0], q=True, ws=True, translation=True)
+        grp = pmc.group(empty=True, name='grp_{0}_{1}_joints'.format(prefix, self._name))
+        root_rotation = pmc.xform(joints[0], q=True, ws=True, rotation=True)
+        root_position = pmc.xform(joints[0], q=True, ws=True, translation=True)
 
-        cmds.xform(grp, a=True, ws=True, rotation=root_rotation, translation=root_position)
+        pmc.xform(grp, a=True, ws=True, rotation=root_rotation, translation=root_position)
 
         if makeConstraints:
             if isolation:
-                cmds.pointConstraint(self._joints[0], grp, maintainOffset=False)
-                cmds.orientConstraint(self._parent, grp, maintainOffset=True)
+                pmc.pointConstraint(self._joints[0], grp, maintainOffset=False)
+                pmc.orientConstraint(self._parent, grp, maintainOffset=True)
             else:
-                cmds.parentConstraint()
+                pmc.parentConstraint()
 
-        cmds.parent(joints[0], grp)
+        pmc.parent(joints[0], grp)
 
         return joints
 
@@ -134,43 +134,43 @@ class Rigging(object):
             ikjoint = jnt.replace('rig_', 'ikj_', 1)
 
             if useConstraints:
-                point = cmds.pointConstraint(ikjoint, fkjoint, jnt, mo=False)[0]
-                orient = cmds.orientConstraint(ikjoint, fkjoint, jnt, mo=False)[0]
+                point = pmc.pointConstraint(ikjoint, fkjoint, jnt, mo=False)
+                orient = pmc.orientConstraint(ikjoint, fkjoint, jnt, mo=False)
 
-                ikreverse = cmds.shadingNode('reverse', asUtility=True, name='rev_{0}_ikfk'.format(jnt))
+                ikreverse = pmc.shadingNode('reverse', asUtility=True, name='rev_{0}_ikfk'.format(jnt))
 
-                orientWeightList = cmds.orientConstraint(orient, q=True, weightAliasList=True)
-                pointWeightList = cmds.pointConstraint(point, q=True, weightAliasList=True)
+                orientWeightList = pmc.orientConstraint(orient, q=True, weightAliasList=True)
+                pointWeightList = pmc.pointConstraint(point, q=True, weightAliasList=True)
 
-                cmds.connectAttr(blendAttr, '{0}.{1}'.format(orient, orientWeightList[1]))
-                cmds.connectAttr(blendAttr, '{0}.{1}'.format(point, pointWeightList[1]))
-                cmds.connectAttr(blendAttr, ikreverse + '.inputX')
-                cmds.connectAttr(ikreverse + '.outputX', '{0}.{1}'.format(orient, orientWeightList[0]))
-                cmds.connectAttr(ikreverse + '.outputX', '{0}.{1}'.format(point, pointWeightList[0]))
+                pmc.connectAttr(blendAttr, orientWeightList[1])
+                pmc.connectAttr(blendAttr, pointWeightList[1])
+                pmc.connectAttr(blendAttr, ikreverse + '.inputX')
+                pmc.connectAttr(ikreverse + '.outputX', orientWeightList[0])
+                pmc.connectAttr(ikreverse + '.outputX', pointWeightList[0])
 
                 if stretchy:
-                    scale = cmds.scaleConstraint(ikjoint, fkjoint, jnt, mo=False)[0]
-                    scaleWeightList = cmds.scaleConstraint(point, q=True, weightAliasList=True)
-                    cmds.connectAttr(blendAttr, '{0}.{1}'.format(scale, scaleWeightList[1]))
-                    cmds.connectAttr(ikreverse + '.outputX', '{0}.{1}'.format(scale, scaleWeightList[0]))
+                    scale = pmc.scaleConstraint(ikjoint, fkjoint, jnt, mo=False)
+                    scaleWeightList = pmc.scaleConstraint(point, q=True, weightAliasList=True)
+                    pmc.connectAttr(blendAttr, scaleWeightList[1])
+                    pmc.connectAttr(ikreverse + '.outputX', scaleWeightList[0])
 
             else:
-                rotationblender = cmds.shadingNode('blendColors', asUtility=True, name='bln_{0}_ikfk_rot'.format(jnt))
+                rotationblender = pmc.shadingNode('blendColors', asUtility=True, name='bln_{0}_ikfk_rot'.format(jnt))
 
-                cmds.connectAttr(fkjoint + '.rotate', rotationblender + '.color1')
-                cmds.connectAttr(ikjoint + '.rotate', rotationblender + '.color2')
+                pmc.connectAttr(fkjoint + '.rotate', rotationblender + '.color1')
+                pmc.connectAttr(ikjoint + '.rotate', rotationblender + '.color2')
 
-                cmds.connectAttr(blendAttr, rotationblender + '.blender')
-                cmds.connectAttr(rotationblender + '.output', jnt + '.rotate')
+                pmc.connectAttr(blendAttr, rotationblender + '.blender')
+                pmc.connectAttr(rotationblender + '.output', jnt + '.rotate')
 
                 if stretchy and jnt != joints[0]:
-                    node = cmds.shadingNode('blendColors', asUtility=True, name='bln_{0}_ikfk_scale'.format(jnt))
+                    node = pmc.shadingNode('blendColors', asUtility=True, name='bln_{0}_ikfk_scale'.format(jnt))
 
-                    cmds.connectAttr(fkjoint + '.tx', node + '.color1R')
-                    cmds.connectAttr(ikjoint + '.tx', node + '.color2R')
+                    pmc.connectAttr(fkjoint + '.tx', node + '.color1R')
+                    pmc.connectAttr(ikjoint + '.tx', node + '.color2R')
 
-                    cmds.connectAttr(blendAttr, node + '.blender')
-                    cmds.connectAttr(node + '.outputR', jnt + '.tx')
+                    pmc.connectAttr(blendAttr, node + '.blender')
+                    pmc.connectAttr(node + '.outputR', jnt + '.tx')
 
     def makeOrientSwitchNodes(self, joint, preTransform, name=None):
         """
@@ -183,37 +183,37 @@ class Rigging(object):
         if name is None:
             name = self._name
 
-        cmds.pointConstraint(joint, preTransform)
+        pmc.pointConstraint(joint, preTransform)
 
-        parentTarget = cmds.group(empty=True, name='tgt_{0}_local'.format(name))
-        worldTarget = cmds.group(empty=True, name='tgt_{0}_world'.format(name))
+        parentTarget = pmc.group(empty=True, name='tgt_{0}_local'.format(name))
+        worldTarget = pmc.group(empty=True, name='tgt_{0}_world'.format(name))
         alignObjects([parentTarget, worldTarget], preTransform)
 
-        cmds.parentConstraint(self._parent, parentTarget, maintainOffset=True)
-        cmds.parentConstraint(self._mainControl, worldTarget, maintainOffset=True)
+        pmc.parentConstraint(self._parent, parentTarget, maintainOffset=True)
+        pmc.parentConstraint(self._mainControl, worldTarget, maintainOffset=True)
 
-        constraint = cmds.orientConstraint(parentTarget, preTransform)[0]
-        cmds.orientConstraint(worldTarget, preTransform)
-        cmds.setAttr(constraint + '.interpType', 2)  # shortest interpolation (less flipping)
+        constraint = pmc.orientConstraint(parentTarget, preTransform)
+        pmc.orientConstraint(worldTarget, preTransform)
+        pmc.setAttr(constraint + '.interpType', 2)  # shortest interpolation (less flipping)
 
         orientAttr = getAttribute(self._switchboard, name + '_isolation',
                                   min=0, max=1, defaultValue=1, keyable=True)
 
-        revAttrNode = cmds.shadingNode('reverse', asUtility=True, name='rev_{0}_isolation'.format(name))
+        revAttrNode = pmc.shadingNode('reverse', asUtility=True, name='rev_{0}_isolation'.format(name))
 
-        orientWeightList = cmds.orientConstraint(constraint, q=True, weightAliasList=True)
-        cmds.connectAttr(orientAttr, '{0}.{1}'.format(constraint, orientWeightList[1]))
-        cmds.connectAttr(orientAttr, revAttrNode + '.inputX')
-        cmds.connectAttr(revAttrNode + '.outputX', '{0}.{1}'.format(constraint, orientWeightList[0]))
+        orientWeightList = pmc.orientConstraint(constraint, q=True, weightAliasList=True)
+        pmc.connectAttr(orientAttr, orientWeightList[1])
+        pmc.connectAttr(orientAttr, revAttrNode + '.inputX')
+        pmc.connectAttr(revAttrNode + '.outputX', orientWeightList[0])
 
         return [parentTarget, worldTarget]
 
     def makeNoFlipHelper(self, ikHandle, aimVector):
-        helper = cmds.group(empty=True, name=ikHandle.replace('ikh_', 'hlp_ik_') + '_noflipper')
-        startJoint = cmds.ikHandle(ikHandle, q=True, sj=True)
+        helper = pmc.group(empty=True, name=ikHandle.replace('ikh_', 'hlp_ik_') + '_noflipper')
+        startJoint = pmc.ikHandle(ikHandle, q=True, sj=True)
 
-        cmds.pointConstraint(startJoint, helper, maintainOffset=False)
-        cmds.aimConstraint(ikHandle, helper, aimVector=aimVector, upVector=aimVector, worldUpType='objectrotation',
+        pmc.pointConstraint(startJoint, helper, maintainOffset=False)
+        pmc.aimConstraint(ikHandle, helper, aimVector=aimVector, upVector=aimVector, worldUpType='objectrotation',
                            worldUpVector=(0, 1, 0), worldUpObject=self._mainControl)
         return helper
 
@@ -240,10 +240,10 @@ class RiggingLeg(Rigging):
         fkrig = self.makeFkRig()
         ikrig = self.makeIkRig()
 
-        fkjointgrp = cmds.listRelatives(self._fkjoints[0], parent=True)[0]
-        ikjointgrp = cmds.listRelatives(self._ikjoints[0], parent=True)[0]
+        fkjointgrp = pmc.listRelatives(self._fkjoints[0], parent=True)[0]
+        ikjointgrp = pmc.listRelatives(self._ikjoints[0], parent=True)[0]
 
-        cmds.parent(fkrig, fkjointgrp, ikrig, ikjointgrp, self.transform)
+        pmc.parent(fkrig, fkjointgrp, ikrig, ikjointgrp, self.transform)
 
         self.lockAndHide(True)
 
@@ -253,7 +253,7 @@ class RiggingLeg(Rigging):
         Assumes user selects hip, knee, ankle, and ball joint; rigs with control curves
         returns created controls as PyNodes
         """
-        mainGroup = cmds.group(empty=True, name='grp_fk_{0}_rig'.format(self._name))
+        mainGroup = pmc.group(empty=True, name='grp_fk_{0}_rig'.format(self._name))
 
         jnts = {'hip': self._fkjoints[0], 'knee': self._fkjoints[1], 'ankle': self._fkjoints[2],
                 'ball': self._fkjoints[3], 'toe': self._fkjoints[4]}
@@ -267,47 +267,47 @@ class RiggingLeg(Rigging):
         self._rigControls['fk_ball'], ballPreTransform = makeControlNode(name='ctl_fk_{0}_ball'.format(self._name),
                                                                          targetObject=jnts['ball'])
 
-        cmds.pointConstraint(jnts['hip'], hipPreTransform)
+        pmc.pointConstraint(jnts['hip'], hipPreTransform)
 
-        parentTarget = cmds.group(empty=True, name='tgt_fk_{0}_local'.format(self._name))
-        worldTarget = cmds.group(empty=True, name='tgt_fk_{0}_world'.format(self._name))
+        parentTarget = pmc.group(empty=True, name='tgt_fk_{0}_local'.format(self._name))
+        worldTarget = pmc.group(empty=True, name='tgt_fk_{0}_world'.format(self._name))
         alignObjects([parentTarget, worldTarget], hipPreTransform)
 
-        cmds.parentConstraint(self._parent, parentTarget, maintainOffset=True)
-        cmds.parentConstraint(self._mainControl, worldTarget, maintainOffset=True)
+        pmc.parentConstraint(self._parent, parentTarget, maintainOffset=True)
+        pmc.parentConstraint(self._mainControl, worldTarget, maintainOffset=True)
 
-        constraint = cmds.orientConstraint(parentTarget, hipPreTransform)[0]
-        cmds.orientConstraint(worldTarget, hipPreTransform)
-        cmds.setAttr(constraint + '.interpType', 2)  # shortest interpolation (less flipping)
+        constraint = pmc.orientConstraint(parentTarget, hipPreTransform)
+        pmc.orientConstraint(worldTarget, hipPreTransform)
+        pmc.setAttr(constraint + '.interpType', 2)  # shortest interpolation (less flipping)
 
         orientAttr = getAttribute(self._switchboard, self._name + '_fk_isolation',
                                   min=0, max=1, defaultValue=1, keyable=True)
 
-        revAttrNode = cmds.shadingNode('reverse', asUtility=True, name='rev_{0}_fk_isolation'.format(self._name))
+        revAttrNode = pmc.shadingNode('reverse', asUtility=True, name='rev_{0}_fk_isolation'.format(self._name))
 
-        orientWeightList = cmds.orientConstraint(constraint, q=True, weightAliasList=True)
-        cmds.connectAttr(orientAttr, '{0}.{1}'.format(constraint, orientWeightList[1]))
-        cmds.connectAttr(orientAttr, revAttrNode + '.inputX')
-        cmds.connectAttr(revAttrNode + '.outputX', '{0}.{1}'.format(constraint, orientWeightList[0]))
+        orientWeightList = pmc.orientConstraint(constraint, q=True, weightAliasList=True)
+        pmc.connectAttr(orientAttr, orientWeightList[1])
+        pmc.connectAttr(orientAttr, revAttrNode + '.inputX')
+        pmc.connectAttr(revAttrNode + '.outputX', orientWeightList[0])
 
-        cmds.parent(parentTarget, worldTarget, mainGroup)
+        pmc.parent(parentTarget, worldTarget, mainGroup)
 
-        cmds.orientConstraint(self._rigControls['fk_ball'], jnts['ball'])
-        cmds.orientConstraint(self._rigControls['fk_ankle'], jnts['ankle'])
-        cmds.orientConstraint(self._rigControls['fk_knee'], jnts['knee'])
-        cmds.orientConstraint(self._rigControls['fk_hip'], jnts['hip'])
+        pmc.orientConstraint(self._rigControls['fk_ball'], jnts['ball'])
+        pmc.orientConstraint(self._rigControls['fk_ankle'], jnts['ankle'])
+        pmc.orientConstraint(self._rigControls['fk_knee'], jnts['knee'])
+        pmc.orientConstraint(self._rigControls['fk_hip'], jnts['hip'])
 
-        cmds.parent(ballPreTransform, self._rigControls['fk_ankle'], absolute=True)
-        cmds.parent(anklePreTransform, self._rigControls['fk_knee'], absolute=True)
-        cmds.parent(kneePreTransform, self._rigControls['fk_hip'])
+        pmc.parent(ballPreTransform, self._rigControls['fk_ankle'], absolute=True)
+        pmc.parent(anklePreTransform, self._rigControls['fk_knee'], absolute=True)
+        pmc.parent(kneePreTransform, self._rigControls['fk_hip'])
 
-        cmds.parent(hipPreTransform, mainGroup)
+        pmc.parent(hipPreTransform, mainGroup)
 
         if self._switchAttr:
-            cmds.connectAttr(self._switchAttr, self._rigControls['fk_ankle'] + '.visibility')
-            cmds.connectAttr(self._switchAttr, self._rigControls['fk_ball'] + '.visibility')
-            cmds.connectAttr(self._switchAttr, self._rigControls['fk_knee'] + '.visibility')
-            cmds.connectAttr(self._switchAttr, self._rigControls['fk_hip'] + '.visibility')
+            pmc.connectAttr(self._switchAttr, self._rigControls['fk_ankle'] + '.visibility')
+            pmc.connectAttr(self._switchAttr, self._rigControls['fk_ball'] + '.visibility')
+            pmc.connectAttr(self._switchAttr, self._rigControls['fk_knee'] + '.visibility')
+            pmc.connectAttr(self._switchAttr, self._rigControls['fk_hip'] + '.visibility')
 
         self.lockAttrs.append(self._rigControls['fk_ankle'] + '.translateX')
         self.lockAttrs.append(self._rigControls['fk_ankle'] + '.translateY')
@@ -346,7 +346,7 @@ class RiggingLeg(Rigging):
         return mainGroup
 
     def makeIkRig(self):
-        mainGroup = cmds.group(empty=True, name='grp_ik_{0}_rig'.format(self._name))
+        mainGroup = pmc.group(empty=True, name='grp_ik_{0}_rig'.format(self._name))
 
         jnts = {'hip': self._ikjoints[0], 'knee': self._ikjoints[1], 'ankle': self._ikjoints[2],
                 'ball': self._ikjoints[3], 'toe': self._ikjoints[4]}
@@ -354,148 +354,148 @@ class RiggingLeg(Rigging):
         self._rigControls['ik_leg'], legPreTransform = makeControlNode(name='ctl_ik_{0}'.format(self._name),
                                                                        targetObject=jnts['ankle'], alignRotation=False)
 
-        cmds.setAttr(self._rigControls['ik_leg'] + '.rotateOrder', ROO_XZY)
+        pmc.setAttr(self._rigControls['ik_leg'] + '.rotateOrder', ROO_XZY)
 
-        legHandle = cmds.ikHandle(sj=jnts['hip'], ee=jnts['ankle'], sol='ikRPsolver',
+        legHandle = pmc.ikHandle(sj=jnts['hip'], ee=jnts['ankle'], sol='ikRPsolver',
                                   n='ikh_{0}_leg'.format(self._name))[0]
-        ballHandle = cmds.ikHandle(sj=jnts['ankle'], ee=jnts['ball'], sol='ikSCsolver',
+        ballHandle = pmc.ikHandle(sj=jnts['ankle'], ee=jnts['ball'], sol='ikSCsolver',
                                    n='ikh_{0}_ball'.format(self._name))[0]
-        toeHandle = cmds.ikHandle(sj=jnts['ball'], ee=jnts['toe'], sol='ikSCsolver',
+        toeHandle = pmc.ikHandle(sj=jnts['ball'], ee=jnts['toe'], sol='ikSCsolver',
                                   n='ikh_{0}_toe'.format(self._name))[0]
 
         self._rigControls['ik_knee'], poleLine = makePoleVectorControlFromHandle('ctl_ik_{0}_pole'.format(self._name),
                                                                                  legHandle, parent=mainGroup)
 
-        cmds.poleVectorConstraint(self._rigControls['ik_knee'], legHandle)
-        cmds.parent(legHandle, ballHandle, toeHandle, self._rigControls['ik_leg'])
+        pmc.poleVectorConstraint(self._rigControls['ik_knee'], legHandle)
+        pmc.parent(legHandle, ballHandle, toeHandle, self._rigControls['ik_leg'])
 
         # setup reverse foot nodes
         self._rigControls['ik_toe'], toePreTransform = makeControlNode(name='ctl_ik_{0}_toeRoll'.format(self._name),
                                                                        targetObject=jnts['ball'])
-        toeRollNode = cmds.group(toePreTransform, name='hlp_ik_{0}_toeRoll'.format(self._name))
-        ballRollNode = cmds.group(empty=True, name='hlp_ik_{0}_ballRoll'.format(self._name))
-        toePivotNode = cmds.group(empty=True, name='hlp_ik_{0}_toePivot'.format(self._name))
-        toeYawNode = cmds.group(empty=True, name='hlp_ik_{0}_toeYaw'.format(self._name))
-        heelPivotNode = cmds.group(empty=True, name='hlp_ik_{0}_heelPivot'.format(self._name))
-        footBankInNode = cmds.group(empty=True, name='hlp_ik_{0}_footBankIn'.format(self._name))
-        footBankOutNode = cmds.group(empty=True, name='hlp_ik_{0}_footBankOut'.format(self._name))
+        toeRollNode = pmc.group(toePreTransform, name='hlp_ik_{0}_toeRoll'.format(self._name))
+        ballRollNode = pmc.group(empty=True, name='hlp_ik_{0}_ballRoll'.format(self._name))
+        toePivotNode = pmc.group(empty=True, name='hlp_ik_{0}_toePivot'.format(self._name))
+        toeYawNode = pmc.group(empty=True, name='hlp_ik_{0}_toeYaw'.format(self._name))
+        heelPivotNode = pmc.group(empty=True, name='hlp_ik_{0}_heelPivot'.format(self._name))
+        footBankInNode = pmc.group(empty=True, name='hlp_ik_{0}_footBankIn'.format(self._name))
+        footBankOutNode = pmc.group(empty=True, name='hlp_ik_{0}_footBankOut'.format(self._name))
 
         # positioning
-        cmds.xform([ballRollNode, toeYawNode], worldSpace=True,
-                   translation=cmds.xform(jnts['ball'], q=True, ws=True, t=True))
+        pmc.xform([ballRollNode, toeYawNode], worldSpace=True,
+                   translation=pmc.xform(jnts['ball'], q=True, ws=True, t=True))
 
-        toePivotPosition = cmds.xform(jnts['toe'], q=True, worldSpace=True, translation=True)
+        toePivotPosition = pmc.xform(jnts['toe'], q=True, worldSpace=True, translation=True)
         toePivotPosition[1] = 0.0
-        cmds.xform(toePivotNode, worldSpace=True, translation=toePivotPosition)
+        pmc.xform(toePivotNode, worldSpace=True, translation=toePivotPosition)
 
         # Heel pivot and foot bank will vary based on geometry, create a locator that can adjust the pivot
-        heelLocator = cmds.spaceLocator(n='loc_ik_{0}_heelPivot'.format(self._name))[0]
-        footBankInLocator = cmds.spaceLocator(n='loc_ik_{0}_footBankIn'.format(self._name))[0]
-        footBankOutLocator = cmds.spaceLocator(n='loc_ik_{0}_footBankOut'.format(self._name))[0]
-        cmds.xform((heelPivotNode, heelLocator, footBankInNode, footBankOutNode, footBankInLocator, footBankOutLocator),
-                   worldSpace=True, translation=cmds.xform(jnts['ankle'], q=True, ws=True, t=True))
+        heelLocator = pmc.spaceLocator(n='loc_ik_{0}_heelPivot'.format(self._name))
+        footBankInLocator = pmc.spaceLocator(n='loc_ik_{0}_footBankIn'.format(self._name))
+        footBankOutLocator = pmc.spaceLocator(n='loc_ik_{0}_footBankOut'.format(self._name))
+        pmc.xform((heelPivotNode, heelLocator, footBankInNode, footBankOutNode, footBankInLocator, footBankOutLocator),
+                   worldSpace=True, translation=pmc.xform(jnts['ankle'], q=True, ws=True, t=True))
 
-        cmds.parent(toeRollNode, ballRollNode, toeYawNode)
-        cmds.parent(toeYawNode, toePivotNode)
-        cmds.parent(toePivotNode, heelPivotNode)
-        cmds.parent(heelPivotNode, footBankInNode)
-        cmds.parent(footBankInNode, footBankOutNode)
-        cmds.parent(footBankOutNode, heelLocator, footBankInLocator, footBankOutLocator, self._rigControls['ik_leg'])
+        pmc.parent(toeRollNode, ballRollNode, toeYawNode)
+        pmc.parent(toeYawNode, toePivotNode)
+        pmc.parent(toePivotNode, heelPivotNode)
+        pmc.parent(heelPivotNode, footBankInNode)
+        pmc.parent(footBankInNode, footBankOutNode)
+        pmc.parent(footBankOutNode, heelLocator, footBankInLocator, footBankOutLocator, self._rigControls['ik_leg'])
 
-        cmds.makeIdentity((heelLocator, footBankInLocator, footBankOutLocator), apply=True)
-        cmds.connectAttr(heelLocator + '.translate', heelPivotNode + '.rotatePivot')
-        cmds.connectAttr(footBankInLocator + '.translate', footBankInNode + '.rotatePivot')
-        cmds.connectAttr(footBankOutLocator + '.translate', footBankOutNode + '.rotatePivot')
+        pmc.makeIdentity((heelLocator, footBankInLocator, footBankOutLocator), apply=True)
+        pmc.connectAttr(heelLocator + '.translate', heelPivotNode + '.rotatePivot')
+        pmc.connectAttr(footBankInLocator + '.translate', footBankInNode + '.rotatePivot')
+        pmc.connectAttr(footBankOutLocator + '.translate', footBankOutNode + '.rotatePivot')
 
         # Add and connect foot roll attributes
-        cmds.addAttr(self._rigControls['ik_leg'], ln=self.TOE_ROLL_ATTR_NAME, softMinValue=-10, softMaxValue=10,
+        pmc.addAttr(self._rigControls['ik_leg'], ln=self.TOE_ROLL_ATTR_NAME, softMinValue=-10, softMaxValue=10,
                      defaultValue=0, keyable=True)
-        cmds.addAttr(self._rigControls['ik_leg'], ln=self.BALL_ROLL_ATTR_NAME, min=-10, max=10, defaultValue=0,
+        pmc.addAttr(self._rigControls['ik_leg'], ln=self.BALL_ROLL_ATTR_NAME, min=-10, max=10, defaultValue=0,
                      keyable=True)
-        cmds.addAttr(self._rigControls['ik_leg'], ln=self.TOE_PIVOT_ATTR_NAME, min=0, max=10, defaultValue=0,
+        pmc.addAttr(self._rigControls['ik_leg'], ln=self.TOE_PIVOT_ATTR_NAME, min=0, max=10, defaultValue=0,
                      keyable=True)
-        cmds.addAttr(self._rigControls['ik_leg'], ln=self.TOE_YAW_ATTR_NAME, min=-10, max=10, defaultValue=0,
+        pmc.addAttr(self._rigControls['ik_leg'], ln=self.TOE_YAW_ATTR_NAME, min=-10, max=10, defaultValue=0,
                      keyable=True)
-        cmds.addAttr(self._rigControls['ik_leg'], ln=self.HEEL_PIVOT_ATTR_NAME, min=0, max=10, defaultValue=0,
+        pmc.addAttr(self._rigControls['ik_leg'], ln=self.HEEL_PIVOT_ATTR_NAME, min=0, max=10, defaultValue=0,
                      keyable=True)
-        cmds.addAttr(self._rigControls['ik_leg'], ln=self.FOOT_BANK_ATTR_NAME, min=-10, max=10, defaultValue=0,
+        pmc.addAttr(self._rigControls['ik_leg'], ln=self.FOOT_BANK_ATTR_NAME, min=-10, max=10, defaultValue=0,
                      keyable=True)
 
-        toeRollMultiply = cmds.shadingNode('multiplyDivide', asUtility=True, n='mul_ik_{0}_toeRoll'.format(self._name))
-        ballRollMultiply = cmds.shadingNode('multiplyDivide', asUtility=True,
+        toeRollMultiply = pmc.shadingNode('multiplyDivide', asUtility=True, n='mul_ik_{0}_toeRoll'.format(self._name))
+        ballRollMultiply = pmc.shadingNode('multiplyDivide', asUtility=True,
                                             n='mul_ik_{0}_ballRoll'.format(self._name))
-        toePivotMultiply = cmds.shadingNode('multiplyDivide', asUtility=True,
+        toePivotMultiply = pmc.shadingNode('multiplyDivide', asUtility=True,
                                             n='mul_ik_{0}_toePivot'.format(self._name))
-        toeYawMultiply = cmds.shadingNode('multiplyDivide', asUtility=True, n='mul_ik_{0}_toeYaw'.format(self._name))
-        heelPivotMultiply = cmds.shadingNode('multiplyDivide', asUtility=True,
+        toeYawMultiply = pmc.shadingNode('multiplyDivide', asUtility=True, n='mul_ik_{0}_toeYaw'.format(self._name))
+        heelPivotMultiply = pmc.shadingNode('multiplyDivide', asUtility=True,
                                              n='mul_ik_{0}_heelPivot'.format(self._name))
 
-        footBankRemap = cmds.shadingNode('remapValue', asUtility=True,
+        footBankRemap = pmc.shadingNode('remapValue', asUtility=True,
                                          n='rmv_ik_{0}_footBank'.format(self._name))
-        footBankClamp = cmds.shadingNode('clamp', asUtility=True,
+        footBankClamp = pmc.shadingNode('clamp', asUtility=True,
                                          n='clp_ik_{0}_footBank'.format(self._name))
 
-        cmds.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.TOE_ROLL_ATTR_NAME),
+        pmc.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.TOE_ROLL_ATTR_NAME),
                          toeRollMultiply + '.input1X')
-        cmds.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.BALL_ROLL_ATTR_NAME),
+        pmc.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.BALL_ROLL_ATTR_NAME),
                          ballRollMultiply + '.input1X')
-        cmds.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.TOE_PIVOT_ATTR_NAME),
+        pmc.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.TOE_PIVOT_ATTR_NAME),
                          toePivotMultiply + '.input1X')
-        cmds.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.TOE_YAW_ATTR_NAME),
+        pmc.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.TOE_YAW_ATTR_NAME),
                          toeYawMultiply + '.input1Y')
-        cmds.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.HEEL_PIVOT_ATTR_NAME),
+        pmc.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.HEEL_PIVOT_ATTR_NAME),
                          heelPivotMultiply + '.input1X')
 
-        cmds.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.FOOT_BANK_ATTR_NAME),
+        pmc.connectAttr('{0}.{1}'.format(self._rigControls['ik_leg'], self.FOOT_BANK_ATTR_NAME),
                          footBankRemap + '.inputValue')
-        cmds.connectAttr(footBankRemap + '.outValue', footBankClamp + '.inputR')
-        cmds.connectAttr(footBankRemap + '.outValue', footBankClamp + '.inputG')
+        pmc.connectAttr(footBankRemap + '.outValue', footBankClamp + '.inputR')
+        pmc.connectAttr(footBankRemap + '.outValue', footBankClamp + '.inputG')
 
-        cmds.setAttr(toeRollMultiply + '.input2X', -9.5)
-        cmds.setAttr(ballRollMultiply + '.input2X', 9.5)
-        cmds.setAttr(toePivotMultiply + '.input2X', 9.5)
-        cmds.setAttr(toeYawMultiply + '.input2Y', 9.5)
-        cmds.setAttr(heelPivotMultiply + '.input2X', -11.0)
-        cmds.setAttr(footBankRemap + '.inputMin', -10.0)
-        cmds.setAttr(footBankRemap + '.inputMax', 10.0)
-        cmds.setAttr(footBankRemap + '.outputMin', -90.0)
-        cmds.setAttr(footBankRemap + '.outputMax', 90.0)
-        cmds.setAttr(footBankClamp + '.maxR', 90.0)
-        cmds.setAttr(footBankClamp + '.minG', -90.0)
+        pmc.setAttr(toeRollMultiply + '.input2X', -9.5)
+        pmc.setAttr(ballRollMultiply + '.input2X', 9.5)
+        pmc.setAttr(toePivotMultiply + '.input2X', 9.5)
+        pmc.setAttr(toeYawMultiply + '.input2Y', 9.5)
+        pmc.setAttr(heelPivotMultiply + '.input2X', -11.0)
+        pmc.setAttr(footBankRemap + '.inputMin', -10.0)
+        pmc.setAttr(footBankRemap + '.inputMax', 10.0)
+        pmc.setAttr(footBankRemap + '.outputMin', -90.0)
+        pmc.setAttr(footBankRemap + '.outputMax', 90.0)
+        pmc.setAttr(footBankClamp + '.maxR', 90.0)
+        pmc.setAttr(footBankClamp + '.minG', -90.0)
 
-        cmds.connectAttr(toeRollMultiply + '.outputX', toeRollNode + '.rotateX')
-        cmds.connectAttr(ballRollMultiply + '.outputX', ballRollNode + '.rotateX')
-        cmds.connectAttr(toePivotMultiply + '.outputX', toePivotNode + '.rotateX')
-        cmds.connectAttr(toeYawMultiply + '.outputY', toeYawNode + '.rotateY')
-        cmds.connectAttr(heelPivotMultiply + '.outputX', heelPivotNode + '.rotateX')
-        cmds.connectAttr(footBankClamp + '.outputR', footBankInNode + '.rotateZ')
-        cmds.connectAttr(footBankClamp + '.outputG', footBankOutNode + '.rotateZ')
+        pmc.connectAttr(toeRollMultiply + '.outputX', toeRollNode + '.rotateX')
+        pmc.connectAttr(ballRollMultiply + '.outputX', ballRollNode + '.rotateX')
+        pmc.connectAttr(toePivotMultiply + '.outputX', toePivotNode + '.rotateX')
+        pmc.connectAttr(toeYawMultiply + '.outputY', toeYawNode + '.rotateY')
+        pmc.connectAttr(heelPivotMultiply + '.outputX', heelPivotNode + '.rotateX')
+        pmc.connectAttr(footBankClamp + '.outputR', footBankInNode + '.rotateZ')
+        pmc.connectAttr(footBankClamp + '.outputG', footBankOutNode + '.rotateZ')
 
-        cmds.parent(toeHandle, self._rigControls['ik_toe'])
-        cmds.parent(ballHandle, toeRollNode)
-        cmds.parent(legHandle, ballRollNode)
+        pmc.parent(toeHandle, self._rigControls['ik_toe'])
+        pmc.parent(ballHandle, toeRollNode)
+        pmc.parent(legHandle, ballRollNode)
 
         # parent to a group aligned to ankle joint, that is constrained only to y orientation
-        kneeToFootHelper = cmds.group(empty=True, name='hlp_{0}_knee_to_foot'.format(self._name))
+        kneeToFootHelper = pmc.group(empty=True, name='hlp_{0}_knee_to_foot'.format(self._name))
 
         alignObjects([kneeToFootHelper, ], self._rigControls['ik_leg'])
-        cmds.parentConstraint(self._rigControls['ik_leg'], kneeToFootHelper, skipRotate=['x', 'z'], maintainOffset=True)
+        pmc.parentConstraint(self._rigControls['ik_leg'], kneeToFootHelper, skipRotate=['x', 'z'], maintainOffset=True)
 
         noFlipHelper = self.makeNoFlipHelper(legHandle, self._noflipvector)
-        kneePolePreT = cmds.listRelatives(self._rigControls['ik_knee'], p=True)
-        cmds.parent(kneePolePreT, noFlipHelper)
+        kneePolePreT = pmc.listRelatives(self._rigControls['ik_knee'], p=True)
+        pmc.parent(kneePolePreT, noFlipHelper)
 
-        poleTwistHelper = cmds.group(kneePolePreT, name='hlp_ik_{0}_poletwist'.format(self._name))
-        cmds.xform(poleTwistHelper, objectSpace=True, pivots=(0, 0, 0))
-        cmds.connectAttr(kneeToFootHelper + '.rotateY', poleTwistHelper + '.rotateY')
+        poleTwistHelper = pmc.group(kneePolePreT, name='hlp_ik_{0}_poletwist'.format(self._name))
+        pmc.xform(poleTwistHelper, objectSpace=True, pivots=(0, 0, 0))
+        pmc.connectAttr(kneeToFootHelper + '.rotateY', poleTwistHelper + '.rotateY')
 
-        cmds.parent(noFlipHelper, kneeToFootHelper, legPreTransform, mainGroup)
+        pmc.parent(noFlipHelper, kneeToFootHelper, legPreTransform, mainGroup)
 
-        revIkVis = cmds.shadingNode('reverse', asUtility=True, name='rev_{0}_ik_visibility'.format(self._name))
+        revIkVis = pmc.shadingNode('reverse', asUtility=True, name='rev_{0}_ik_visibility'.format(self._name))
 
-        cmds.connectAttr(self._switchAttr, revIkVis + '.inputX')
-        cmds.connectAttr(revIkVis + '.outputX', self._rigControls['ik_leg'] + '.visibility')
-        cmds.connectAttr(revIkVis + '.outputX', self._rigControls['ik_knee'] + '.visibility')
+        pmc.connectAttr(self._switchAttr, revIkVis + '.inputX')
+        pmc.connectAttr(revIkVis + '.outputX', self._rigControls['ik_leg'] + '.visibility')
+        pmc.connectAttr(revIkVis + '.outputX', self._rigControls['ik_knee'] + '.visibility')
 
         self.lockAttrs.append(self._rigControls['ik_leg'] + '.scaleX')
         self.lockAttrs.append(self._rigControls['ik_leg'] + '.scaleY')
@@ -536,20 +536,20 @@ class RiggingArm(Rigging):
         self._ikjoints = self.makeJointSystems('ikj')
         self.connectJointChains(joints=self._joints, blendAttr='{0}.{1}_ikfk'.format(switchboard, self._name))
 
-        fkjointgrp = cmds.listRelatives(self._fkjoints[0], parent=True)[0]
-        ikjointgrp = cmds.listRelatives(self._ikjoints[0], parent=True)[0]
+        fkjointgrp = pmc.listRelatives(self._fkjoints[0], parent=True)[0]
+        ikjointgrp = pmc.listRelatives(self._ikjoints[0], parent=True)[0]
 
         fkrig = self.makeFkRig()
         ikrig = self.makeIkRig()
 
-        cmds.parent(fkjointgrp, ikjointgrp, fkrig, ikrig, self.transform)
+        pmc.parent(fkjointgrp, ikjointgrp, fkrig, ikrig, self.transform)
 
-        cmds.hide((fkjointgrp, ikjointgrp))
+        pmc.hide((fkjointgrp, ikjointgrp))
 
         self.lockAndHide(True)
 
     def makeFkRig(self):
-        mainGroup = cmds.group(empty=True, name='grp_fk_{0}_rig'.format(self._name))
+        mainGroup = pmc.group(empty=True, name='grp_fk_{0}_rig'.format(self._name))
 
         jnts = {'shoulder': self._fkjoints[0], 'elbow': self._fkjoints[1], 'wrist': self._fkjoints[2]}
 
@@ -567,34 +567,34 @@ class RiggingArm(Rigging):
 
         parentTarget, worldTarget = self.makeOrientSwitchNodes(jnts['shoulder'], shoulderPreTransform,
                                                                name=self._name + '_fk')
-        cmds.parent(parentTarget, worldTarget, mainGroup)
+        pmc.parent(parentTarget, worldTarget, mainGroup)
 
-        cmds.orientConstraint(self._rigControls['fk_gimbal_wrist'], jnts['wrist'])
-        cmds.orientConstraint(self._rigControls['fk_elbow'], jnts['elbow'])
-        cmds.orientConstraint(self._rigControls['fk_shoulder'], jnts['shoulder'])
+        pmc.orientConstraint(self._rigControls['fk_gimbal_wrist'], jnts['wrist'])
+        pmc.orientConstraint(self._rigControls['fk_elbow'], jnts['elbow'])
+        pmc.orientConstraint(self._rigControls['fk_shoulder'], jnts['shoulder'])
 
-        cmds.parent(self._rigControls['fk_gimbal_wrist'], self._rigControls['fk_wrist'])
-        cmds.parent(wristPreTransform, self._rigControls['fk_elbow'], absolute=True)
-        cmds.parent(elbowPreTransform, self._rigControls['fk_shoulder'])
+        pmc.parent(self._rigControls['fk_gimbal_wrist'], self._rigControls['fk_wrist'])
+        pmc.parent(wristPreTransform, self._rigControls['fk_elbow'], absolute=True)
+        pmc.parent(elbowPreTransform, self._rigControls['fk_shoulder'])
 
-        cmds.parent(shoulderPreTransform, mainGroup)
+        pmc.parent(shoulderPreTransform, mainGroup)
 
-        cmds.addAttr(self._rigControls['fk_wrist'], at='short', ln='showGimbal', min=0, max=1, defaultValue=1,
+        pmc.addAttr(self._rigControls['fk_wrist'], at='short', ln='showGimbal', min=0, max=1, defaultValue=1,
                      keyable=False, hidden=False)
-        cmds.setAttr(self._rigControls['fk_wrist'] + '.showGimbal', edit=True, channelBox=True)
+        pmc.setAttr(self._rigControls['fk_wrist'] + '.showGimbal', edit=True, channelBox=True)
 
         if self._switchAttr:
-            cmds.connectAttr(self._switchAttr, self._rigControls['fk_shoulder'] + '.visibility')
-            cmds.connectAttr(self._switchAttr, self._rigControls['fk_elbow'] + '.visibility')
-            cmds.connectAttr(self._switchAttr, self._rigControls['fk_wrist'] + '.visibility')
+            pmc.connectAttr(self._switchAttr, self._rigControls['fk_shoulder'] + '.visibility')
+            pmc.connectAttr(self._switchAttr, self._rigControls['fk_elbow'] + '.visibility')
+            pmc.connectAttr(self._switchAttr, self._rigControls['fk_wrist'] + '.visibility')
 
-            gimbalVisMultNode = cmds.shadingNode('multiplyDivide', asUtility=True,
+            gimbalVisMultNode = pmc.shadingNode('multiplyDivide', asUtility=True,
                                                  name='mul_fk_{0}_showGimbal'.format(self._name))
 
-            cmds.connectAttr(self._switchAttr, gimbalVisMultNode + '.input1X')
-            cmds.connectAttr(self._rigControls['fk_wrist'] + '.showGimbal',
+            pmc.connectAttr(self._switchAttr, gimbalVisMultNode + '.input1X')
+            pmc.connectAttr(self._rigControls['fk_wrist'] + '.showGimbal',
                              gimbalVisMultNode + '.input2X')
-            cmds.connectAttr(gimbalVisMultNode + '.outputX', self._rigControls['fk_gimbal_wrist'] + '.visibility')
+            pmc.connectAttr(gimbalVisMultNode + '.outputX', self._rigControls['fk_gimbal_wrist'] + '.visibility')
 
         self.lockAttrs.append(self._rigControls['fk_wrist'] + '.translateX')
         self.lockAttrs.append(self._rigControls['fk_wrist'] + '.translateY')
@@ -630,12 +630,12 @@ class RiggingArm(Rigging):
         self.lockAttrs.append(self._rigControls['fk_gimbal_wrist'] + '.scaleZ')
         self.lockAttrs.append(self._rigControls['fk_gimbal_wrist'] + '.visibility')
 
-        cmds.delete(armGimbalPreTransform)
+        pmc.delete(armGimbalPreTransform)
 
         return mainGroup
 
     def makeIkRig(self):
-        mainGroup = cmds.group(empty=True, name='grp_ik_{0}_rig'.format(self._name))
+        mainGroup = pmc.group(empty=True, name='grp_ik_{0}_rig'.format(self._name))
 
         jnts = {'shoulder': self._ikjoints[0], 'elbow': self._ikjoints[1], 'wrist': self._ikjoints[2]}
 
@@ -645,40 +645,40 @@ class RiggingArm(Rigging):
         self._rigControls['ik_gimbal_wrist'], armGimbalPreTransform = \
             makeControlNode(name='ctl_ik_{0}_wrist_gimbal'.format(self._name), targetObject=jnts['wrist'])
 
-        handle = cmds.ikHandle(sj=jnts['shoulder'], ee=jnts['wrist'], sol='ikRPsolver',
+        handle = pmc.ikHandle(sj=jnts['shoulder'], ee=jnts['wrist'], sol='ikRPsolver',
                                n='ikh_{0}'.format(self._name))[0]
 
         self._rigControls['ik_elbow'], poleLine = makePoleVectorControlFromHandle('ctl_ik_{0}_pole'.format(self._name),
                                                                                   handle, parent=mainGroup)
 
-        elbowPreT = cmds.listRelatives(self._rigControls['ik_elbow'], parent=True)[0]
+        elbowPreT = pmc.listRelatives(self._rigControls['ik_elbow'], parent=True)[0]
 
         noFlipHelper = self.makeNoFlipHelper(handle, self._noflipvector)
-        cmds.parent(elbowPreT, noFlipHelper)
+        pmc.parent(elbowPreT, noFlipHelper)
 
-        cmds.poleVectorConstraint(self._rigControls['ik_elbow'], handle)
-        cmds.parent(self._rigControls['ik_gimbal_wrist'], self._rigControls['ik_wrist'])
-        cmds.parent(handle, self._rigControls['ik_gimbal_wrist'])
-        cmds.orientConstraint(self._rigControls['ik_gimbal_wrist'], jnts['wrist'])
+        pmc.poleVectorConstraint(self._rigControls['ik_elbow'], handle)
+        pmc.parent(self._rigControls['ik_gimbal_wrist'], self._rigControls['ik_wrist'])
+        pmc.parent(handle, self._rigControls['ik_gimbal_wrist'])
+        pmc.orientConstraint(self._rigControls['ik_gimbal_wrist'], jnts['wrist'])
 
-        cmds.parent(armPreTransform, noFlipHelper, mainGroup)
+        pmc.parent(armPreTransform, noFlipHelper, mainGroup)
 
-        cmds.addAttr(self._rigControls['ik_wrist'], at='byte', ln='showGimbal', min=0, max=1,
+        pmc.addAttr(self._rigControls['ik_wrist'], at='byte', ln='showGimbal', min=0, max=1,
                      defaultValue=1, keyable=False, hidden=False)
-        cmds.setAttr(self._rigControls['ik_wrist'] + '.showGimbal', edit=True, channelBox=True)
+        pmc.setAttr(self._rigControls['ik_wrist'] + '.showGimbal', edit=True, channelBox=True)
 
-        revIkVis = cmds.shadingNode('reverse', asUtility=True, name='rev_{0}_ik_visibility'.format(self._name))
+        revIkVis = pmc.shadingNode('reverse', asUtility=True, name='rev_{0}_ik_visibility'.format(self._name))
 
-        cmds.connectAttr(self._switchAttr, revIkVis + '.inputX')
-        cmds.connectAttr(revIkVis + '.outputX', self._rigControls['ik_wrist'] + '.visibility')
-        cmds.connectAttr(revIkVis + '.outputX', self._rigControls['ik_elbow'] + '.visibility')
+        pmc.connectAttr(self._switchAttr, revIkVis + '.inputX')
+        pmc.connectAttr(revIkVis + '.outputX', self._rigControls['ik_wrist'] + '.visibility')
+        pmc.connectAttr(revIkVis + '.outputX', self._rigControls['ik_elbow'] + '.visibility')
 
-        gimbalVisMultNode = cmds.shadingNode('multiplyDivide', asUtility=True,
+        gimbalVisMultNode = pmc.shadingNode('multiplyDivide', asUtility=True,
                                              name='mul_ik_{0}_showGimbal'.format(self._name))
 
-        cmds.connectAttr(revIkVis + '.outputX', gimbalVisMultNode + '.input1X')
-        cmds.connectAttr(self._rigControls['ik_wrist'] + '.showGimbal', gimbalVisMultNode + '.input2X')
-        cmds.connectAttr(gimbalVisMultNode + '.outputX', self._rigControls['ik_gimbal_wrist'] + '.visibility')
+        pmc.connectAttr(revIkVis + '.outputX', gimbalVisMultNode + '.input1X')
+        pmc.connectAttr(self._rigControls['ik_wrist'] + '.showGimbal', gimbalVisMultNode + '.input2X')
+        pmc.connectAttr(gimbalVisMultNode + '.outputX', self._rigControls['ik_gimbal_wrist'] + '.visibility')
 
         self.lockAttrs.append(self._rigControls['ik_wrist'] + '.scaleX')
         self.lockAttrs.append(self._rigControls['ik_wrist'] + '.scaleY')
@@ -701,7 +701,7 @@ class RiggingArm(Rigging):
         self.lockAttrs.append(self._rigControls['ik_gimbal_wrist'] + '.scaleZ')
         self.lockAttrs.append(self._rigControls['ik_gimbal_wrist'] + '.visibility')
 
-        cmds.delete(armGimbalPreTransform)
+        pmc.delete(armGimbalPreTransform)
 
         return mainGroup
 
@@ -717,14 +717,14 @@ class RiggingSpine(Rigging):
 
         # reparent fk joints to seperate pelvic rotation later
         self._fkjoints = self.makeJointSystems('fkj', makeConstraints=False)
-        cmds.parent(self._fkjoints[0], self._fkjoints[1])
+        pmc.parent(self._fkjoints[0], self._fkjoints[1])
 
         self._ikjoints = self.makeJointSystems('ikj', makeConstraints=False)
 
-        fkjointgrp = cmds.listRelatives(self._fkjoints[0], parent=True)[0]
-        ikjointgrp = cmds.listRelatives(self._ikjoints[0], parent=True)[0]
+        fkjointgrp = pmc.listRelatives(self._fkjoints[0], parent=True)[0]
+        ikjointgrp = pmc.listRelatives(self._ikjoints[0], parent=True)[0]
 
-        cmds.parent(fkjointgrp, ikjointgrp, self.transform)
+        pmc.parent(fkjointgrp, ikjointgrp, self.transform)
 
         self.connectJointChains(joints=self._joints, blendAttr='{0}.{1}_ikfk'.format(switchboard, self._name),
                                 stretchy=False, useConstraints=True)
@@ -732,7 +732,7 @@ class RiggingSpine(Rigging):
         # Create, position, and set rotation order to controls
         self._rigControls['root'], rootCtlPreT = makeControlNode(name='ctl_{0}_root'.format(self._name),
                                                                  targetObject=self._joints[1], alignRotation=False)
-        cmds.setAttr(self._rigControls['root'] + '.rotateOrder', ROO_XZY)
+        pmc.setAttr(self._rigControls['root'] + '.rotateOrder', ROO_XZY)
         self.lockAttrs.append(self._rigControls['root'] + '.scaleX')
         self.lockAttrs.append(self._rigControls['root'] + '.scaleY')
         self.lockAttrs.append(self._rigControls['root'] + '.scaleZ')
@@ -741,14 +741,14 @@ class RiggingSpine(Rigging):
         fkrig = self.makeFkRig()
         ikrig = self.makeIkRig()
 
-        cmds.parent(fkrig, self._rigControls['root'])
-        cmds.parent(ikrig, self._rigControls['root'])
-        cmds.parent(rootCtlPreT, self.transform)
+        pmc.parent(fkrig, self._rigControls['root'])
+        pmc.parent(ikrig, self._rigControls['root'])
+        pmc.parent(rootCtlPreT, self.transform)
 
         self.lockAndHide(True)
 
     def makeFkRig(self):
-        mainGroup = cmds.group(empty=True, name='grp_fk_{0}_spinerig'.format(self._name))
+        mainGroup = pmc.group(empty=True, name='grp_fk_{0}_spinerig'.format(self._name))
 
         rootJoint = self._fkjoints[1]
         previousControl = None
@@ -757,18 +757,18 @@ class RiggingSpine(Rigging):
                 control, preTransform = makeControlNode(name=jnt.replace('fkj_', 'ctl_fk_', 1), targetObject=jnt)
 
                 if jnt == rootJoint:
-                    cmds.parent(preTransform, mainGroup)
-                    cmds.parentConstraint(control, jnt)
+                    pmc.parent(preTransform, mainGroup)
+                    pmc.parentConstraint(control, jnt)
                 else:
-                    cmds.parent(preTransform, previousControl)
-                    cmds.connectAttr(control + '.rotate', jnt + '.rotate')
+                    pmc.parent(preTransform, previousControl)
+                    pmc.connectAttr(control + '.rotate', jnt + '.rotate')
             else:
                 control, preTransform = makeControlNode(name=jnt.replace('fkj_', 'ctl_', 1), targetObject=rootJoint)
 
-                cmds.parent(preTransform, mainGroup)
-                cmds.parentConstraint(control, jnt, maintainOffset=True)
+                pmc.parent(preTransform, mainGroup)
+                pmc.parentConstraint(control, jnt, maintainOffset=True)
 
-            cmds.connectAttr(self._switchAttr, control + '.visibility')
+            pmc.connectAttr(self._switchAttr, control + '.visibility')
 
             self.lockAttrs.append(control + '.translateX')
             self.lockAttrs.append(control + '.translateY')
@@ -784,20 +784,20 @@ class RiggingSpine(Rigging):
         return mainGroup
 
     def makeIkRig(self):
-        mainGroup = cmds.group(empty=True, name='grp_ik_{0}_spinerig'.format(self._name))
+        mainGroup = pmc.group(empty=True, name='grp_ik_{0}_spinerig'.format(self._name))
 
         if self._spline is None:
-            splineIk = cmds.ikHandle(sj=self._ikjoints[0], ee=self._ikjoints[-1], sol='ikSplineSolver',
+            splineIk = pmc.ikHandle(sj=self._ikjoints[0], ee=self._ikjoints[-1], sol='ikSplineSolver',
                                      parentCurve=False, createCurve=True, simplifyCurve=True, numSpans=2,
                                      rootOnCurve=False, n='sik_{0}_spine'.format(self._name))
-            self._spline = cmds.rename(splineIk[2], 'spl_{0}_spinerig'.format(self._name))
+            self._spline = pmc.rename(splineIk[2], 'spl_{0}_spinerig'.format(self._name))
         else:
-            splineIk = cmds.ikHandle(sj=self._ikjoints[0], ee=self._ikjoints[-1], sol='ikSplineSolver',
+            splineIk = pmc.ikHandle(sj=self._ikjoints[0], ee=self._ikjoints[-1], sol='ikSplineSolver',
                                      createCurve=False, rootOnCurve=False, curve=self._spline, parentCurve=False,
                                      n='sik_{0}_spine'.format(self._name))
 
         splineHandle = splineIk[0]
-        cmds.setAttr(splineHandle + '.inheritsTransform', 0)
+        pmc.setAttr(splineHandle + '.inheritsTransform', 0)
 
         # Create, position, and set rotation order to controls
         self._rigControls['ik_lwr_spine'], spineCtl0PreT = makeControlNode(
@@ -808,69 +808,69 @@ class RiggingSpine(Rigging):
         self._rigControls['ik_mid_spine'], spineCtl1PreT = makeControlNode(
             name='ctl_ik_{0}_middle_spine'.format(self._name))
 
-        midpoint = cmds.pointOnCurve('spl_spine', parameter=0.5, turnOnPercentage=True, position=True)
-        cmds.xform(spineCtl1PreT, worldSpace=True, translation=midpoint)
+        midpoint = pmc.pointOnCurve('spl_spine', parameter=0.5, turnOnPercentage=True, position=True)
+        pmc.xform(spineCtl1PreT, worldSpace=True, translation=midpoint)
 
         # Create, position, and set rotation order to controls
         self._rigControls['ik_upr_spine'], spineCtl2PreT = makeControlNode(
             name='ctl_ik_{0}_upper_spine'.format(self._name),
             targetObject=self._ikjoints[-1], alignRotation=False)
 
-        cmds.setAttr(self._rigControls['ik_lwr_spine'] + '.rotateOrder', ROO_YXZ)
-        cmds.setAttr(self._rigControls['ik_mid_spine'] + '.rotateOrder', ROO_YXZ)
-        cmds.setAttr(self._rigControls['ik_upr_spine'] + '.rotateOrder', ROO_YXZ)
+        pmc.setAttr(self._rigControls['ik_lwr_spine'] + '.rotateOrder', ROO_YXZ)
+        pmc.setAttr(self._rigControls['ik_mid_spine'] + '.rotateOrder', ROO_YXZ)
+        pmc.setAttr(self._rigControls['ik_upr_spine'] + '.rotateOrder', ROO_YXZ)
 
-        cmds.parent(spineCtl2PreT, self._rigControls['ik_mid_spine'])
-        cmds.parent(spineCtl0PreT, spineCtl1PreT, self._rigControls['root'])
-        cmds.parentConstraint(self._rigControls['ik_lwr_spine'], self._ikjoints[0], maintainOffset=True)
-        cmds.orientConstraint(self._rigControls['ik_upr_spine'], self._ikjoints[-1], maintainOffset=True)
+        pmc.parent(spineCtl2PreT, self._rigControls['ik_mid_spine'])
+        pmc.parent(spineCtl0PreT, spineCtl1PreT, self._rigControls['root'])
+        pmc.parentConstraint(self._rigControls['ik_lwr_spine'], self._ikjoints[0], maintainOffset=True)
+        pmc.orientConstraint(self._rigControls['ik_upr_spine'], self._ikjoints[-1], maintainOffset=True)
 
         # connect controls to ik
         # Using self.joints in place of cluster nodes. They're simpler to work with and do the same thing
         clusterJoints = list()
-        cmds.select(clear=True)
+        pmc.select(clear=True)
         clusterJoints.append(
-            cmds.joint(position=cmds.xform(self._ikjoints[1], q=True, worldSpace=True, translation=True), radius=4,
+            pmc.joint(position=pmc.xform(self._ikjoints[1], q=True, worldSpace=True, translation=True), radius=4,
                        name='clj_spine0'))
-        cmds.select(clear=True)
+        pmc.select(clear=True)
         clusterJoints.append(
-            cmds.joint(position=midpoint, radius=4, name='clj_spine1'))
-        cmds.select(clear=True)
+            pmc.joint(position=midpoint, radius=4, name='clj_spine1'))
+        pmc.select(clear=True)
         clusterJoints.append(
-            cmds.joint(position=cmds.xform(self._ikjoints[-1], q=True, worldSpace=True, translation=True), radius=4,
+            pmc.joint(position=pmc.xform(self._ikjoints[-1], q=True, worldSpace=True, translation=True), radius=4,
                        name='clj_spine2'))
 
-        cmds.parent(clusterJoints[0], self._rigControls['ik_lwr_spine'])
-        cmds.parent(clusterJoints[1], self._rigControls['ik_mid_spine'])
-        cmds.parent(clusterJoints[2], self._rigControls['ik_upr_spine'])
+        pmc.parent(clusterJoints[0], self._rigControls['ik_lwr_spine'])
+        pmc.parent(clusterJoints[1], self._rigControls['ik_mid_spine'])
+        pmc.parent(clusterJoints[2], self._rigControls['ik_upr_spine'])
 
-        cmds.skinCluster(clusterJoints, self._spline, maximumInfluences=2)
+        pmc.skinCluster(clusterJoints, self._spline, maximumInfluences=2)
 
-        cmds.setAttr(splineHandle + '.dTwistControlEnable', 1)
+        pmc.setAttr(splineHandle + '.dTwistControlEnable', 1)
 
-        cmds.setAttr(splineHandle + '.dWorldUpType', 4)
-        cmds.setAttr(splineHandle + '.dWorldUpAxis', 0)
+        pmc.setAttr(splineHandle + '.dWorldUpType', 4)
+        pmc.setAttr(splineHandle + '.dWorldUpAxis', 0)
 
-        cmds.setAttr(splineHandle + '.dWorldUpVectorX', 0.0)
-        cmds.setAttr(splineHandle + '.dWorldUpVectorY', 0.0)
-        cmds.setAttr(splineHandle + '.dWorldUpVectorZ', -1.0)
-        cmds.setAttr(splineHandle + '.dWorldUpVectorEndX', 0.0)
-        cmds.setAttr(splineHandle + '.dWorldUpVectorEndY', 0.0)
-        cmds.setAttr(splineHandle + '.dWorldUpVectorEndZ', -1.0)
+        pmc.setAttr(splineHandle + '.dWorldUpVectorX', 0.0)
+        pmc.setAttr(splineHandle + '.dWorldUpVectorY', 0.0)
+        pmc.setAttr(splineHandle + '.dWorldUpVectorZ', -1.0)
+        pmc.setAttr(splineHandle + '.dWorldUpVectorEndX', 0.0)
+        pmc.setAttr(splineHandle + '.dWorldUpVectorEndY', 0.0)
+        pmc.setAttr(splineHandle + '.dWorldUpVectorEndZ', -1.0)
 
-        cmds.connectAttr(self._rigControls['ik_lwr_spine'] + '.worldMatrix[0]',
+        pmc.connectAttr(self._rigControls['ik_lwr_spine'] + '.worldMatrix[0]',
                          splineHandle + '.dWorldUpMatrix')
 
-        cmds.connectAttr(self._rigControls['ik_upr_spine'] + '.worldMatrix[0]',
+        pmc.connectAttr(self._rigControls['ik_upr_spine'] + '.worldMatrix[0]',
                          splineHandle + '.dWorldUpMatrixEnd')
 
-        cmds.parent(splineHandle, self._spline, mainGroup)
+        pmc.parent(splineHandle, self._spline, mainGroup)
 
-        revIkVis = cmds.shadingNode('reverse', asUtility=True, name='rev_{0}_ik_visibility'.format(self._name))
-        cmds.connectAttr(self._switchAttr, revIkVis + '.inputX')
-        cmds.connectAttr(revIkVis + '.outputX', self._rigControls['ik_lwr_spine'] + '.visibility')
-        cmds.connectAttr(revIkVis + '.outputX', self._rigControls['ik_mid_spine'] + '.visibility')
-        cmds.connectAttr(revIkVis + '.outputX', self._rigControls['ik_upr_spine'] + '.visibility')
+        revIkVis = pmc.shadingNode('reverse', asUtility=True, name='rev_{0}_ik_visibility'.format(self._name))
+        pmc.connectAttr(self._switchAttr, revIkVis + '.inputX')
+        pmc.connectAttr(revIkVis + '.outputX', self._rigControls['ik_lwr_spine'] + '.visibility')
+        pmc.connectAttr(revIkVis + '.outputX', self._rigControls['ik_mid_spine'] + '.visibility')
+        pmc.connectAttr(revIkVis + '.outputX', self._rigControls['ik_upr_spine'] + '.visibility')
 
         self.lockAttrs.append(self._rigControls['ik_lwr_spine'] + '.scaleX')
         self.lockAttrs.append(self._rigControls['ik_lwr_spine'] + '.scaleY')
@@ -905,7 +905,7 @@ class RiggingFingers(Rigging):
 
         handGrp = self.makeRig()
 
-        cmds.parent(handGrp, self.transform)
+        pmc.parent(handGrp, self.transform)
 
         self.lockAndHide(True)
 
@@ -914,7 +914,7 @@ class RiggingFingers(Rigging):
 
         for root in self._joints:
             fingers = [root]
-            childFingers = cmds.listRelatives(root, children=True, allDescendents=True, type='joint')
+            childFingers = pmc.listRelatives(root, children=True, allDescendents=True, type='joint')
             childFingers.reverse()
             fingers.extend(childFingers)
 
@@ -927,35 +927,35 @@ class RiggingFingers(Rigging):
                 control, preTransform = makeControlNode(name=fng.replace('rig_', 'ctl_', 1), targetObject=fng)
 
                 if previousControl:
-                    cmds.parent(preTransform, previousControl)
-                    drivenGrp = cmds.group(control, name='hlp_' + control)
+                    pmc.parent(preTransform, previousControl)
+                    drivenGrp = pmc.group(control, name='hlp_' + control)
 
-                    curlNode = cmds.shadingNode('multiplyDivide', asUtility=True,
+                    curlNode = pmc.shadingNode('multiplyDivide', asUtility=True,
                                                 n='mul_{0}_{1}_curl'.format(self._name, fng))
 
-                    cmds.setAttr(curlNode + '.input2Z', -11.0)
-                    cmds.connectAttr(curlAttr, curlNode + '.input1Z')
-                    cmds.connectAttr(curlNode + '.outputZ', drivenGrp + '.rotateZ')
+                    pmc.setAttr(curlNode + '.input2Z', -11.0)
+                    pmc.connectAttr(curlAttr, curlNode + '.input1Z')
+                    pmc.connectAttr(curlNode + '.outputZ', drivenGrp + '.rotateZ')
 
-                    stretchRangeNode = cmds.shadingNode('setRange', asUtility=True,
+                    stretchRangeNode = pmc.shadingNode('setRange', asUtility=True,
                                                         n='rng_{0}_{1}_stretch'.format(self._name, fng))
 
                     if self._reverseStretch:
-                        revStretchNode = cmds.shadingNode('reverse', asUtility=True,
+                        revStretchNode = pmc.shadingNode('reverse', asUtility=True,
                                                           n='rev_{0}_{1}_stretch'.format(self._name, fng))
-                        cmds.connectAttr(stretchAttr, revStretchNode + '.inputX')
-                        cmds.connectAttr(revStretchNode + '.outputX', stretchRangeNode + '.valueX')
+                        pmc.connectAttr(stretchAttr, revStretchNode + '.inputX')
+                        pmc.connectAttr(revStretchNode + '.outputX', stretchRangeNode + '.valueX')
                     else:
-                        cmds.connectAttr(stretchAttr, stretchRangeNode + '.valueX')
+                        pmc.connectAttr(stretchAttr, stretchRangeNode + '.valueX')
 
-                    cmds.setAttr(stretchRangeNode + '.minX', self._minStretch)
-                    cmds.setAttr(stretchRangeNode + '.maxX', self._maxStretch)
-                    cmds.setAttr(stretchRangeNode + '.oldMinX', -10.0)
-                    cmds.setAttr(stretchRangeNode + '.oldMaxX', 10.0)
+                    pmc.setAttr(stretchRangeNode + '.minX', self._minStretch)
+                    pmc.setAttr(stretchRangeNode + '.maxX', self._maxStretch)
+                    pmc.setAttr(stretchRangeNode + '.oldMinX', -10.0)
+                    pmc.setAttr(stretchRangeNode + '.oldMaxX', 10.0)
 
-                    cmds.connectAttr(stretchRangeNode + '.outValueX', drivenGrp + '.translateX')
+                    pmc.connectAttr(stretchRangeNode + '.outValueX', drivenGrp + '.translateX')
 
-                    cmds.connectAttr(visibilityAttr, preTransform + '.visibility')
+                    pmc.connectAttr(visibilityAttr, preTransform + '.visibility')
                 else:
                     curlAttr = getAttribute(control, self.FINGER_CURL_ATTR_NAME,
                                             min=-10.0, max=10.0, defaultValue=0, keyable=True)
@@ -964,9 +964,9 @@ class RiggingFingers(Rigging):
                     visibilityAttr = getAttribute(control, self.FINGER_VIS_ATTR_NAME, at='short',
                                                   min=0, max=1, defaultValue=1, keyable=True, hidden=False)
 
-                    cmds.setAttr(visibilityAttr, edit=True, channelBox=True)
+                    pmc.setAttr(visibilityAttr, edit=True, channelBox=True)
 
-                cmds.parentConstraint(control, fng)
+                pmc.parentConstraint(control, fng)
 
                 if fng != root:
                     self.lockAttrs.append(control + '.rotateX')
@@ -985,9 +985,9 @@ class RiggingFingers(Rigging):
                 previousControl = control
                 self._rigControls[fng] = control
 
-        groupNode = cmds.group(empty=True, name='grp_{0}_fingers'.format(self._name))
-        cmds.parentConstraint(self._parent, groupNode, maintainOffset=False)
-        cmds.parent(rootTransforms, groupNode)
+        groupNode = pmc.group(empty=True, name='grp_{0}_fingers'.format(self._name))
+        pmc.parentConstraint(self._parent, groupNode, maintainOffset=False)
+        pmc.parent(rootTransforms, groupNode)
 
         return groupNode
 
@@ -998,12 +998,12 @@ class RiggingHead(Rigging):
 
         handGrp = self.makeRig()
 
-        cmds.parent(handGrp, self.transform)
+        pmc.parent(handGrp, self.transform)
 
         self.lockAndHide(True)
 
     def makeRig(self):
-        mainGroup = cmds.group(empty=True, name='grp_{0}_headrig'.format(self._name))
+        mainGroup = pmc.group(empty=True, name='grp_{0}_headrig'.format(self._name))
 
         jnts = {'neck': self._joints[0], 'head': self._joints[1]}
 
@@ -1012,35 +1012,35 @@ class RiggingHead(Rigging):
         self._rigControls['head'], preHeadTransform = makeControlNode(name='ctl_{0}_head'.format(self._name),
                                                                       targetObject=jnts['head'])
 
-        parentTarget = cmds.group(empty=True, name='tgt_{0}_local'.format(self._name))
-        worldTarget = cmds.group(empty=True, name='tgt_{0}_world'.format(self._name))
+        parentTarget = pmc.group(empty=True, name='tgt_{0}_local'.format(self._name))
+        worldTarget = pmc.group(empty=True, name='tgt_{0}_world'.format(self._name))
         alignObjects([parentTarget, worldTarget], preTransform)
 
-        cmds.parentConstraint(self._parent, parentTarget, maintainOffset=True)
-        cmds.parentConstraint(self._mainControl, worldTarget, maintainOffset=True)
+        pmc.parentConstraint(self._parent, parentTarget, maintainOffset=True)
+        pmc.parentConstraint(self._mainControl, worldTarget, maintainOffset=True)
 
-        cmds.pointConstraint(jnts['neck'], preTransform, maintainOffset=False)
+        pmc.pointConstraint(jnts['neck'], preTransform, maintainOffset=False)
 
-        constraint = cmds.orientConstraint(parentTarget, preTransform,
+        constraint = pmc.orientConstraint(parentTarget, preTransform,
                                            n=self._name + '_orientConstraint')[0]
-        cmds.orientConstraint(worldTarget, preTransform, n=self._name + '_orientConstraint')
-        cmds.setAttr(constraint + '.interpType', 2)  # shortest interpolation (less flipping)
+        pmc.orientConstraint(worldTarget, preTransform, n=self._name + '_orientConstraint')
+        pmc.setAttr(constraint + '.interpType', 2)  # shortest interpolation (less flipping)
 
         orientAttr = getAttribute(self._switchboard, self._name + '_isolation',
                                   min=0, max=1, defaultValue=0, keyable=True)
 
-        revAttrNode = cmds.shadingNode('reverse', asUtility=True, name='rev_{0}_isolation'.format(self._name))
+        revAttrNode = pmc.shadingNode('reverse', asUtility=True, name='rev_{0}_isolation'.format(self._name))
 
-        orientWeightList = cmds.orientConstraint(constraint, q=True, weightAliasList=True)
-        cmds.connectAttr(orientAttr, '{0}.{1}'.format(constraint, orientWeightList[1]))
-        cmds.connectAttr(orientAttr, revAttrNode + '.inputX')
-        cmds.connectAttr(revAttrNode + '.outputX', '{0}.{1}'.format(constraint, orientWeightList[0]))
+        orientWeightList = pmc.orientConstraint(constraint, q=True, weightAliasList=True)
+        pmc.connectAttr(orientAttr, orientWeightList[1])
+        pmc.connectAttr(orientAttr, revAttrNode + '.inputX')
+        pmc.connectAttr(revAttrNode + '.outputX', orientWeightList[0])
 
-        cmds.parent([parentTarget, worldTarget], mainGroup)
+        pmc.parent([parentTarget, worldTarget], mainGroup)
 
-        cmds.parent(preHeadTransform, self._rigControls['neck'])
-        cmds.orientConstraint(self._rigControls['neck'], jnts['neck'])
-        cmds.connectAttr(self._rigControls['head'] + '.rotate', jnts['head'] + '.rotate')
+        pmc.parent(preHeadTransform, self._rigControls['neck'])
+        pmc.orientConstraint(self._rigControls['neck'], jnts['neck'])
+        pmc.connectAttr(self._rigControls['head'] + '.rotate', jnts['head'] + '.rotate')
 
         self.lockAttrs.append(self._rigControls['neck'] + '.translateX')
         self.lockAttrs.append(self._rigControls['neck'] + '.translateY')
@@ -1058,7 +1058,7 @@ class RiggingHead(Rigging):
         self.lockAttrs.append(self._rigControls['head'] + '.scaleZ')
         self.lockAttrs.append(self._rigControls['head'] + '.visibility')
 
-        cmds.parent(preTransform, mainGroup)
+        pmc.parent(preTransform, mainGroup)
 
         return mainGroup
 
@@ -1069,7 +1069,7 @@ class RiggingClavicle(Rigging):
 
         clavGrp = self.makeRig()
 
-        cmds.parent(clavGrp, self.transform)
+        pmc.parent(clavGrp, self.transform)
 
         self.lockAndHide(True)
 
@@ -1079,8 +1079,8 @@ class RiggingClavicle(Rigging):
         self._rigControls['clav'], preTransform = makeControlNode(name='ctl_{0}'.format(self._name),
                                                                   targetObject=jnts['clav'])
 
-        cmds.connectAttr(self._rigControls['clav'] + '.rotate', jnts['clav'] + '.rotate')
-        cmds.parentConstraint(self._parent, preTransform, maintainOffset=True)
+        pmc.connectAttr(self._rigControls['clav'] + '.rotate', jnts['clav'] + '.rotate')
+        pmc.parentConstraint(self._parent, preTransform, maintainOffset=True)
 
         self.lockAttrs.append(self._rigControls['clav'] + '.translateX')
         self.lockAttrs.append(self._rigControls['clav'] + '.translateY')
@@ -1099,7 +1099,7 @@ class RiggingGenericFK(Rigging):
         self._isolation = isolation
         fkGrp = self.makeRig()
 
-        cmds.parent(fkGrp, self.transform)
+        pmc.parent(fkGrp, self.transform)
 
         self.lockAndHide(True)
 
@@ -1108,7 +1108,7 @@ class RiggingGenericFK(Rigging):
         for i, jnt in enumerate(self._joints):
             self._rigControls[i], preTransform = makeControlNode(name='ctl_{0}'.format(self._name), targetObject=jnt)
 
-            cmds.connectAttr(self._rigControls[i] + '.rotate', jnt + '.rotate')
+            pmc.connectAttr(self._rigControls[i] + '.rotate', jnt + '.rotate')
 
             self.lockAttrs.append(self._rigControls[i] + '.translateX')
             self.lockAttrs.append(self._rigControls[i] + '.translateY')
@@ -1123,9 +1123,9 @@ class RiggingGenericFK(Rigging):
         mainGroup = allPreTransforms[0]
         if self._switchboard and self._isolation:
             targetNodes = self.makeOrientSwitchNodes(self._joints[0], mainGroup)
-            cmds.parent(targetNodes, mainGroup)
+            pmc.parent(targetNodes, mainGroup)
         else:
-            cmds.parentConstraint(self._parent, mainGroup, maintainOffset=True)
+            pmc.parentConstraint(self._parent, mainGroup, maintainOffset=True)
 
         return mainGroup
 
