@@ -717,6 +717,7 @@ class RiggingSpine(Rigging):
 
         # reparent fk joints to seperate pelvic rotation later
         self._fkjoints = self.makeJointSystems('fkj', makeConstraints=False)
+        pmc.parent(self._fkjoints[1], world=True)
         pmc.parent(self._fkjoints[0], self._fkjoints[1])
 
         self._ikjoints = self.makeJointSystems('ikj', makeConstraints=False)
@@ -1022,7 +1023,7 @@ class RiggingHead(Rigging):
         pmc.pointConstraint(jnts['neck'], preTransform, maintainOffset=False)
 
         constraint = pmc.orientConstraint(parentTarget, preTransform,
-                                           n=self._name + '_orientConstraint')[0]
+                                           n=self._name + '_orientConstraint')
         pmc.orientConstraint(worldTarget, preTransform, n=self._name + '_orientConstraint')
         pmc.setAttr(constraint + '.interpType', 2)  # shortest interpolation (less flipping)
 
