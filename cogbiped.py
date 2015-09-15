@@ -897,12 +897,13 @@ class RiggingFingers(Rigging):
     FINGER_VIS_ATTR_NAME = 'extraControls'
 
     def __init__(self, name, joints, parent=None, mainControl=None, minStretch=-1.5, maxStretch=1.5,
-                 reverseStretch=False):
+                 reverseStretch=False, knuckleAxis='Z'):
         super(RiggingFingers, self).__init__(name, joints, parent, mainControl)
 
         self._minStretch = minStretch
         self._maxStretch = maxStretch
         self._reverseStretch = reverseStretch
+        self._knuckleAxis = knuckleAxis
 
         handGrp = self.makeRig()
 
@@ -934,9 +935,9 @@ class RiggingFingers(Rigging):
                     curlNode = pmc.shadingNode('multiplyDivide', asUtility=True,
                                                 n='mul_{0}_{1}_curl'.format(self._name, fng))
 
-                    pmc.setAttr(curlNode + '.input2Z', -11.0)
-                    pmc.connectAttr(curlAttr, curlNode + '.input1Z')
-                    pmc.connectAttr(curlNode + '.outputZ', drivenGrp + '.rotateZ')
+                    pmc.setAttr('{0}.input2{1}'.format(curlNode, self._knuckleAxis), -11.0)
+                    pmc.connectAttr(curlAttr, '{0}.input1{1}'.format(curlNode, self._knuckleAxis))
+                    pmc.connectAttr('{0}.output{1}'.format(curlNode, self._knuckleAxis), '{0}.rotate{1}'.format(drivenGrp, self._knuckleAxis))
 
                     stretchRangeNode = pmc.shadingNode('setRange', asUtility=True,
                                                         n='rng_{0}_{1}_stretch'.format(self._name, fng))
@@ -971,7 +972,10 @@ class RiggingFingers(Rigging):
 
                 if fng != root:
                     self.lockAttrs.append(control + '.rotateX')
-                    self.lockAttrs.append(control + '.rotateY')
+                    if self._knuckleAxis == 'Y':
+                        self.lockAttrs.append(control + '.rotateZ')
+                    elif self._knuckleAxis == 'Z':
+                        self.lockAttrs.append(control + '.rotateY')
                 else:
                     rootTransforms.append(preTransform)
 

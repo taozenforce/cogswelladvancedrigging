@@ -15,13 +15,13 @@ import pymel.core as pmc
 
 class CouplerApp():
     """
-    This coupler detects joints using name prefixes, 
+    This coupler detects joints using name prefixes,
     you can use either my default settings in __init__ or pass your own
     """
 
     def __init__(self, bindPrefix='jnt', rigPrefix='rig'):
         """
-        
+
         """
         self._bindPrefix = bindPrefix
         self._rigPrefix = rigPrefix
@@ -62,7 +62,7 @@ class CouplerApp():
             else:
                 # Find matching jnt in skeleton, if available
                 skinJoint = jnt.replace(self._rigPrefix, self._bindPrefix, 1)
-                if not pmc.objExists(skinJoint):
+                if skinJoint is jnt or not pmc.objExists(skinJoint):
                     continue
 
                 pmc.pointConstraint(jnt, skinJoint, maintainOffset=False)

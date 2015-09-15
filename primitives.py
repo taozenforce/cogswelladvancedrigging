@@ -69,7 +69,7 @@ def selectSquishyJointsCallback():
     except pmc.MayaNodeError:
         return
 
-    bindJoints = [i for i in grp.getChildren(ad=True, type='joint') if i.startswith('jnt_')]
+    bindJoints = [i for i in grp.getChildren(ad=True, type='joint') if i.startswith('local_rig_')]
     pmc.select(bindJoints, r=True)
 
 
@@ -95,7 +95,7 @@ def squishySplineIk(startLoc, endLoc):
         ikj.rename('ikj_spine{0:02d}'.format(i))
 
     # Create second set of joints
-    rigJoints = adv.makeDuplicateJoints(joints=ikJoints, search='ikj_', replace='jnt_', connectBone=False)
+    rigJoints = adv.makeDuplicateJoints(joints=ikJoints, search='ikj_', replace='local_rig_', connectBone=False)
     # HACK I haven't figured out how to create SDK nodes procedurally,
     # so making some dummy locs to make the curve I need
     a = pmc.createNode('transform')
